@@ -29,3 +29,11 @@ test('Controller 恢复正确线程、结果隔离、忙碌拒绝、保存失败
  await c.handle('/切换会话 '+first);await c.handle('continue','k3');await c.starting;assert.equal(rpc.calls.findLast(x=>x.m==='thread/resume').p.threadId,'t1');await c.event({method:'turn/completed',params:{threadId:'t1',turn:{id:'u',status:'completed'}}});
  fail=true;await c.handle('/删除会话 '+first);assert.equal(c.state.currentConversation,first);assert.ok(c.state.conversations.some(s=>s.id===first));assert.match(messages.at(-1),/未完成/);c.close();
 });
+test('可复制命令与固定短序号：排序、重启和删除后不指向别的会话',()=>{
+ const state={threadId:'old'};const first=ensureConversations(state);assert.equal(first.number,1);
+ changeConversation(state,'new','第二个');syncConversation(state);const second=state.currentConversation;
+ assert.match(conversationList(state),/ID：/);assert.match(conversationList(state),/\/切换会话 2/);assert.ok(conversationList(state).includes('/删除会话 '+second));
+ changeConversation(state,'switch','1');assert.equal(state.currentConversation,first.id);changeConversation(state,'switch','2');assert.equal(state.currentConversation,second);
+ const restored=JSON.parse(JSON.stringify(state));changeConversation(restored,'delete','1');assert.throws(()=>changeConversation(restored,'switch','1'),/不存在/);
+ changeConversation(restored,'new','第三个');syncConversation(restored);assert.equal(ensureConversations(restored).number,3);assert.equal(restored.conversations.find(c=>c.id===second).number,2);
+});

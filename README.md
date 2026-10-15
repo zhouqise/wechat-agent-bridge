@@ -87,13 +87,13 @@ wx-agent user stop teammate    # 只停止指定用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.0/wx-codex-bridge-0.18.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.1/wx-codex-bridge-0.18.1.tgz --ignore-scripts
 ```
 
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.0/wx-codex-bridge-0.18.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.1/wx-codex-bridge-0.18.1.tgz --ignore-scripts
 ```
 
 安装包通过 GitHub Releases 提供，尚未发布到 npm。没有全局目录写入权限时，参见[用户目录安装](docs/setup.md#安装)。
