@@ -44,10 +44,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zhouqise/wx-codex-bridge.git"
+    "url": "https://github.com/zhouqise/wechat-agent-bridge.git"
   },
-  "homepage": "https://github.com/zhouqise/wx-codex-bridge#readme",
+  "homepage": "https://github.com/zhouqise/wechat-agent-bridge#readme",
   "bugs": {
-    "url": "https://github.com/zhouqise/wx-codex-bridge/issues"
+    "url": "https://github.com/zhouqise/wechat-agent-bridge/issues"
   }
 }

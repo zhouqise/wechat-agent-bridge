@@ -1,5 +1,10 @@
 # 更新记录
 
+## 仓库更名（2026-10-15）
+
+- GitHub 仓库更名为 `wechat-agent-bridge`，同步项目介绍、安装链接和问题反馈地址。
+- 保留 `wx-codex` 命令、`wx-codex-bridge` 包名及原用户数据目录；现有安装无需迁移。
+
 ## 0.6.0
 
 - 新增本机 Claude Code 引擎，同时支持 CLI 本机认证和 API Key 环境变量模式。

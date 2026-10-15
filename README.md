@@ -1,8 +1,10 @@
-# 微信 AI 开发桥接（Codex / Claude Code）
+# WeChat Agent Bridge · 微信 AI 开发桥接
 
 在个人微信中给本机 Codex 或 Claude Code 发任务，接收结果，并确认需要审批的操作。扫码配置一次，之后在任意目录使用 `wx-codex` 命令。
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
+
+GitHub 仓库已更名为 `wechat-agent-bridge`。为兼容已有安装，命令仍为 `wx-codex`，安装包名和用户数据目录保持不变；已安装用户无需重新安装。
 
 ## 安装
 
@@ -11,7 +13,7 @@
 直接在终端执行以下命令，安装 GitHub Release 中的 v0.6.0：
 
 ```sh
-npm install -g https://github.com/zhouqise/wx-codex-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
 wx-codex setup
 wx-codex start
 ```
@@ -21,7 +23,7 @@ wx-codex start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wx-codex-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -114,7 +116,7 @@ npm pack
 
 ## 开源许可
 
-采用 [MIT 许可证](LICENSE)。欢迎通过 [Issues](https://github.com/zhouqise/wx-codex-bridge/issues) 报告问题，请勿附带登录凭据、二维码或原始会话文件。`package.json` 中的 `private: true` 用于防止误发布到 npm，不影响 GitHub 开源或安装 Release 包。
+采用 [MIT 许可证](LICENSE)。欢迎通过 [Issues](https://github.com/zhouqise/wechat-agent-bridge/issues) 报告问题，请勿附带登录凭据、二维码或原始会话文件。`package.json` 中的 `private: true` 用于防止误发布到 npm，不影响 GitHub 开源或安装 Release 包。
 
 ## Windows 安装（PowerShell）
 
@@ -123,7 +125,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wx-codex-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
 wx-codex.cmd setup
 wx-codex.cmd start
 wx-codex.cmd status
