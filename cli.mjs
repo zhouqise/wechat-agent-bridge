@@ -208,7 +208,7 @@ async function main() {
           await controller.say('这条消息包含暂不支持的附件，请使用文字、截图、微信语音、MP4 视频或 xlsx/docx/pptx 文件。');
           return;
         }
-        await controller.handle(text,key,items.some(i=>[2,3,4,5].includes(i.type))?async signal=>[...await mediaInputs(items,{signal}),...await officeInputs(items,cwd,{signal})]:undefined);
+        await controller.handle(text,key,items.some(i=>[2,3,4,5].includes(i.type))?async (signal,onProgress)=>[...await mediaInputs(items,{signal,onProgress}),...await officeInputs(items,cwd,{signal})]:undefined);
       });
       failures = 0;
       await sleep(1000);

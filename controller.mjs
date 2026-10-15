@@ -1,7 +1,7 @@
 import {randomBytes} from 'node:crypto';
 import {officePython} from './office.mjs';
 
-export const HELP = '直接发文字、截图、微信语音、MP4 视频或 xlsx/docx/pptx 附件即可交给当前引擎。语音/视频最长 2 分钟，视频最多 50 MB，以抽帧分析画面。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/文件：列出结果；/文件 文件名 取回 Office 文件\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
+export const HELP = '直接发文字、截图、微信语音、MP4 视频或 xlsx/docx/pptx 附件即可交给当前引擎。视频最长 30 分钟、最大 200 MB，抽帧并分段转写音轨；语音只使用微信附带转文字。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/文件：列出结果；/文件 文件名 取回 Office 文件\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
 
 export class Controller {
   constructor({rpc, cwd, state = {}, save, send, approvalMs = 300000, label = 'Codex'}) {
@@ -60,7 +60,7 @@ export class Controller {
         this.active.stage='正在接收和解析媒体';
         const abort=new AbortController();this.active.abort=abort;
         await this.say(`已收到媒体，正在解析并交给 ${this.label} 分析。`);
-        try {images=await prepareImages(abort.signal);if(abort.signal.aborted)throw new Error('已取消媒体处理');}
+        try {images=await prepareImages(abort.signal,stage=>{if(this.active?.abort===abort)this.active.stage=stage;});if(abort.signal.aborted)throw new Error('已取消媒体处理');}
         catch(e) {
           this.active=null;
           if(!this.closing)return this.say(`媒体处理失败：${e.message}`);

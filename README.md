@@ -4,16 +4,16 @@
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
 
-从 v0.11.1 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
+从 v0.12.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
 
 ## 安装
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.11.1：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.12.0：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.11.1/wx-codex-bridge-0.11.1.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.12.0/wx-codex-bridge-0.12.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.11.1/wx-codex-bridge-0.11.1.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.12.0/wx-codex-bridge-0.12.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -125,7 +125,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.11.1/wx-codex-bridge-0.11.1.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.12.0/wx-codex-bridge-0.12.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -217,7 +217,7 @@ wx-agent.cmd start
 
 语音只使用微信消息附带的转文字，交给当前引擎处理。如果微信未附带转写，会提示先在微信转成文字，再重新发送文字内容；不会下载语音或调用识别服务。
 
-直接发送 MP4 视频可分析画面：每条最多一个视频，最长 2 分钟、最大 50 MB。均匀抽取 6 帧并附时间标记，同时将首条音轨离线转写为带时间范围的文字，交给模型结合分析。抽样不能覆盖全部动作或细节，转写可能有错漏；不识别人声身份或非语音音效。两种引擎均以文字回复。
+直接发送 MP4 视频可分析画面：每条最多一个视频，最长 30 分钟、最大 200 MB。按时长均匀抽取 6–30 帧并附时间标记，同时将首条音轨按 2 分钟分段离线转写为带时间范围的文字，交给模型结合分析。抽样不能覆盖全部动作或细节，转写可能有错漏；不识别人声身份或非语音音效。两种引擎均以文字回复。
 
 视频需要 FFmpeg（包含 ffprobe）。macOS 可运行 `brew install ffmpeg`；Windows/Linux 按 [FFmpeg 官方说明](https://ffmpeg.org/download.html) 安装并加入 PATH，也可通过 FFMPEG_BINARY、FFPROBE_BINARY 指定绝对路径（Windows 使用 .exe）。随后运行 `wx-agent media-check`；修改环境变量后重启桥接。
 
@@ -248,4 +248,4 @@ Windows 使用 `wx-agent.cmd`，Python 须加入 PATH。安装命令创建用户
 
 视频音轨使用 whisper.cpp 在本机识别。macOS 安装 `brew install whisper-cpp`；Windows/Linux 按 [whisper.cpp 官方说明](https://github.com/ggml-org/whisper.cpp) 安装 `whisper-cli`。从 [官方模型仓库](https://huggingface.co/ggerganov/whisper.cpp/tree/main) 下载多语言 `ggml-base.bin`（约 142 MiB），放到 `wx-agent paths` 数据目录下的 `models/ggml-base.bin`，或设置 `WHISPER_MODEL` 为绝对路径。`WHISPER_BINARY` 可指定可执行文件路径；Windows 使用 .exe。
 
-运行 `wx-agent media-check` 检查 FFmpeg、FFprobe、Whisper 和模型，再重启桥接。视频解析不上传原始音轨给转写服务，但抽帧与转写文字会交给当前 Codex/Claude 模型。临时音频和字幕在完成或失败后清理；处理过程中可 `/取消`。没有音轨时只看画面；组件缺失、超时或转写失败时明确说明本次只分析画面，不假装已听懂。微信语音消息保持原规则：只用微信附带文字，没有文字就提示重发文字。
+运行 `wx-agent media-check` 检查 FFmpeg、FFprobe、Whisper 和模型，再重启桥接。视频解析不上传原始音轨给转写服务，但抽帧与转写文字会交给当前 Codex/Claude 模型。临时音频和字幕在完成或失败后清理；处理过程中可 `/状态` 查看抽帧或转写段数，或 `/取消`。视频下载超时为 5 分钟，每段转写超时为 10 分钟；长视频可能耗时较久。累计字幕上限 12 万字符，超限或失败的段落会明确标记缺失，其余段落继续处理。没有音轨时只看画面；组件缺失、超时或转写失败时明确说明本次只分析画面，不假装已听懂。微信语音消息保持原规则：只用微信附带文字，没有文字就提示重发文字。

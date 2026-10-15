@@ -66,12 +66,13 @@ export async function imageInputs(items,{fetcher=fetch,maxBytes=10*1024*1024,sig
   return inputs;
 }
 
-export async function downloadMedia(item,{fetcher=fetch,maxBytes=50*1024*1024,signal}={}) {
+export async function downloadMedia(item,{fetcher=fetch,maxBytes=50*1024*1024,signal,timeoutMs=30000}={}) {
   try {
-    const response=await fetcher(downloadURL(item.media || {}),{redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)});
-    let bytes=await boundedBytes(response,maxBytes);
+    const response=await fetcher(downloadURL(item.media || {}),{redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(timeoutMs)]):AbortSignal.timeout(timeoutMs)});
+    let bytes=await boundedBytes(response,maxBytes+16);
     const key=aesKey(item);
     if(key){const d=createDecipheriv('aes-128-ecb',key,null);bytes=Buffer.concat([d.update(bytes),d.final()]);}
+    if(bytes.length>maxBytes)throw new MediaError('媒体超过大小限制');
     return bytes;
   }catch {if(signal?.aborted)throw new MediaError('已取消媒体处理');throw new MediaError('媒体下载或解密失败，可能超过大小限制，请重新发送较短的语音或视频。');}
 }
