@@ -5,11 +5,14 @@ import fs from 'node:fs/promises';
 
 export function paths(env = process.env, platform = process.platform, home = os.homedir()) {
   const win=platform==='win32', p=win?path.win32:path.posix;
-  const dir = p.resolve(env.WX_CODEX_HOME || env.BRIDGE_STATE_DIR ||
+  const baseDir = p.resolve(env.WX_CODEX_HOME || env.BRIDGE_STATE_DIR ||
     (win ? p.join(env.LOCALAPPDATA || p.join(home,'AppData','Local'),'wx-codex') :
     platform === 'darwin' ? p.join(home,'Library','Application Support','wx-codex') : p.join(env.XDG_DATA_HOME || p.join(home,'.local','share'),'wx-codex')));
+  const user=env.WX_AGENT_USER || '';
+  if(user && (!/^[a-z][a-z0-9_-]{0,23}$/.test(user)||/^(default|con|prn|aux|nul|com[1-9]|lpt[1-9])$/.test(user)))throw new Error('无效的用户名称');
+  const dir=user?p.join(baseDir,'users',user):baseDir;
   const pipeId=createHash('sha256').update(win?dir.toLowerCase():dir).digest('hex').slice(0,32);
-  return {dir,platform,config:p.join(dir,'config.json'),session:p.join(dir,'session.json'),
+  return {dir,baseDir,user,platform,config:p.join(dir,'config.json'),session:p.join(dir,'session.json'),
     lock:p.join(dir,'running.lock'),socket:win?`\\\\.\\pipe\\wx-codex-${pipeId}`:p.join(dir,'control.sock'),
     controlToken:p.join(dir,'control-token.json'),log:p.join(dir,'service.log'),qr:p.join(dir,'pairing.png'),workspace:p.join(dir,'workspace')};
 }

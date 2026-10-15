@@ -52,7 +52,7 @@ export async function mediaInputs(items,{signal,fetcher=fetch,run=exec,env=proce
     if(!probe.streams?.some(s=>s.codec_type==='audio')) {
       result.push({type:'text',text:'视频没有音轨，本次只分析抽样画面，不推断语音或背景音内容。'});
     } else {
-      const model=env.WHISPER_MODEL || path.join(paths(env).dir,'models','ggml-base.bin');
+      const model=env.WHISPER_MODEL || path.join(paths(env).baseDir,'models','ggml-base.bin');
       try {
         if(!await fs.stat(model).then(s=>s.isFile(),()=>false))throw new MediaError('未配置视频音轨识别模型');
         const segments=Math.ceil(duration/SEGMENT);let used=0;

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {paths, privateDir, acquireLock, releaseLock, readJSON, writeJSON} from './paths.mjs';
+import {paths, privateDir, acquireLock, releaseLock, readJSON, writeJSON,alive} from './paths.mjs';
 import {serve} from './service.mjs';
 import {createInterface} from 'node:readline/promises';
 import QRCode from 'qrcode';
@@ -105,7 +105,10 @@ async function login() {
 
 async function main() {
   await privateDir(dir);
+  const updating=async()=>alive(Number(await fs.readFile(path.join(p.baseDir,'update.lock'),'utf8').catch(()=>'')));
+  if(await updating())throw Error('安装包正在更新，请稍后启动');
   await acquireLock(p);locked = true;
+  if(await updating())throw Error('安装包正在更新，请稍后启动');
   if(process.argv.includes('--login') && process.argv.includes('--force')) {
     await fs.rename(sessionPath,sessionPath+'.backup').catch(e=>{if(e.code!=='ENOENT')throw e;});
   }

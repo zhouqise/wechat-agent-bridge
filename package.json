@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -42,7 +42,8 @@
     "office_tool.py",
     "file-send.mjs",
     "update.mjs",
-    "web.mjs"
+    "web.mjs",
+    "users.mjs"
   ],
   "os": [
     "darwin",

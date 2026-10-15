@@ -14,14 +14,22 @@ import {CodexRPC} from './rpc.mjs';
 import {codexCommand,claudeCommand} from './platform.mjs';
 import {ClaudeRPC} from './claude.mjs';
 import {updatePackage,updateFetcher} from './update.mjs';
+import {userNames,provisionUser,requireUser,profileState,archiveUser} from './users.mjs';
 import {engineName} from './engines.mjs';
 
+const userFlag=process.argv.indexOf('--user');
+if(userFlag>=0){process.env.WX_AGENT_USER=process.argv[userFlag+1]||'!invalid';process.argv.splice(userFlag,2);}
 const run=promisify(execFile), p=paths();
 const root=path.dirname(fileURLToPath(import.meta.url));
 const worker=path.join(root,'cli.mjs');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
 
+  user add 名称  新增用户、扫码并启动（--no-login 仅创建）
+  user list      查看所有用户与运行状态
+  user start/stop/status/login/logs 名称  管理指定用户
+  user remove 名称  停用并归档已停止用户，保留工作文件
+  --user 名称    对指定用户执行 start/status/model 等命令
   setup          首次配置：环境检查、工作目录、代理、微信扫码
   start          后台启动，关闭终端仍运行
   stop           停止桥接及其引擎子进程
@@ -43,6 +51,36 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
 
 配置和凭证独立保存，升级或卸载 npm 包不会删除它们。
 支持 macOS / Linux / Windows。未注册开机自启。`;
+
+async function user() {
+  if(p.user)throw Error('user 管理命令请勿同时指定 --user');
+  const [action,name,...args]=process.argv.slice(3);
+  if(action==='list') {
+    for(const value of ['',...await userNames(p.baseDir)]) {
+      const target=value?await requireUser(p.baseDir,value):p,state=await profileState(target);
+      const session=await readJSON(target.session,{}),config=await readJSON(target.config,{});
+      console.log(`${value||'default'}：${session.owner?'已绑定':'未绑定'}；${state?state.task==='空闲'?'运行中，空闲':state.task:'已停止'}；${config.workspace||target.workspace}`);
+    }return;
+  }
+  if(!['add','start','stop','status','login','logs','remove'].includes(action))throw Error('用法：wx-agent user add/list/start/stop/status/login/logs/remove 名称');
+  await privateDir(p.baseDir);
+  const guard={...p,lock:path.join(p.baseDir,'users.lock')};await acquireLock(guard);
+  try {
+    let target;
+    if(action==='add') {
+      if(args.some(a=>a!=='--no-login'))throw Error('用法：user add 名称 [--no-login]');
+      target=await provisionUser(p.baseDir,name);console.log(`已创建用户 ${name}，独立工作区：${target.workspace}`);
+      if(args.includes('--no-login')){console.log(`稍后执行 wx-agent user login ${name}，扫码后自动启动。`);return;}
+    }else target=await requireUser(p.baseDir,name);
+    if(action==='remove'){console.log('用户已停用，绑定和工作文件归档于：'+await archiveUser(p.baseDir,name));return;}
+    const env={...process.env,WX_CODEX_HOME:p.baseDir,WX_AGENT_USER:name};
+    const invoke=command=>new Promise((resolve,reject)=>{
+      const child=spawn(process.execPath,[path.join(root,'wx-agent.mjs'),command,...(command==='logs'?args:[])],{stdio:'inherit',env,windowsHide:true});
+      child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(Error('用户操作失败，请检查以上提示')));
+    });
+    if(action==='add'||action==='login'){await invoke('login');await invoke('start');}else await invoke(action);
+  }finally{await releaseLock(guard);}
+}
 
 async function running() {try {const r=await control(p);return r.service==='wx-codex'?r:null;}catch{return null;}}
 async function busy() {
@@ -175,17 +213,24 @@ async function stop() {
   throw new Error('停止尚未确认，请稍后执行 wx-agent status');
 }
 async function update() {
+  if(p.user)throw Error('安装包由所有用户共用，请不带 --user 执行 update');
   if(process.argv.slice(3).some(a=>a!=='--check'))throw Error('用法：wx-agent update [--check]');
   await privateDir(p.dir);
   const config=await readJSON(p.config,{});
   const proxy=process.env.WX_AGENT_UPDATE_PROXY || process.env.HTTPS_PROXY || (config.engine==='claude'?config.claudeProxy:config.codexProxy);
-  const guard={...p,lock:path.join(p.dir,'update.lock')};await acquireLock(guard);
-  try {await updatePackage({root,fetcher:updateFetcher(proxy),current:JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version,check:process.argv.includes('--check'),
+  const usersGuard={...p,lock:path.join(p.baseDir,'users.lock')};await acquireLock(usersGuard);
+  let guard;
+  try {
+    guard={...p,lock:path.join(p.dir,'update.lock')};await acquireLock(guard);
+  try {
+    if(!process.argv.includes('--check'))for(const name of await userNames(p.baseDir))if(await profileState(await requireUser(p.baseDir,name)))throw Error(`用户 ${name} 仍在运行，请先 wx-agent user stop ${name}，升级后再 user start ${name}；不会中断其他用户任务`);
+    await updatePackage({root,fetcher:updateFetcher(proxy),current:JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version,check:process.argv.includes('--check'),
     state:async()=>{const state=await running();if(!state&&await busy())throw Error('服务正在启动或配置，请稍后重试');return state;},
     stop:async()=>{const result=await control(p,'stop-if-idle');if(result.error)throw Error('服务未安全停止：请等待任务结束后手动 stop，再重试 update');for(let i=0;i<60;i++){await sleep(200);if(!await busy())return;}throw Error('停止未确认，请稍后重试');},
     lock:()=>acquireLock(p),unlock:()=>releaseLock(p),
-    restart:async()=>{await run(process.execPath,[path.join(root,'wx-agent.mjs'),'start'],{timeout:30000,windowsHide:true});}
+    restart:async()=>{await releaseLock(guard);await run(process.execPath,[path.join(root,'wx-agent.mjs'),'start'],{timeout:30000,windowsHide:true});}
   });}finally{await releaseLock(guard);}
+  }finally{await releaseLock(usersGuard);}
 }
 async function status() {
   const state=await running();
@@ -235,7 +280,7 @@ async function mediaCheck() {
     try {await run(binary,[label==='Whisper'?'-h':'-version'],{timeout:10000,windowsHide:true});console.log(label+'：已安装');}
     catch{throw new Error(label+' 不可用，请按 README 安装或配置可执行文件路径');}
   }
-  const model=process.env.WHISPER_MODEL || path.join(p.dir,'models','ggml-base.bin');
+  const model=process.env.WHISPER_MODEL || path.join(p.baseDir,'models','ggml-base.bin');
   if(!await fs.stat(model).then(s=>s.isFile(),()=>false))throw new Error('视频音轨识别模型未配置，请按 README 下载或设置 WHISPER_MODEL');
   console.log('视频抽帧与音轨识别组件已就绪；微信语音仍只使用微信附带转文字。');
 }
@@ -275,10 +320,10 @@ async function migrate() {
 try {
   if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
-  const commands={setup,start,stop,update,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
+  const commands={setup,start,stop,update,user,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.14.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.15.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

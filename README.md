@@ -13,7 +13,7 @@
 直接在终端执行以下命令，安装 GitHub Release 中的 v0.13.1：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.14.0/wx-codex-bridge-0.14.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.0/wx-codex-bridge-0.15.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.14.0/wx-codex-bridge-0.14.0.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.0/wx-codex-bridge-0.15.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -129,7 +129,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.14.0/wx-codex-bridge-0.14.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.0/wx-codex-bridge-0.15.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -262,3 +262,26 @@ Windows 使用 `wx-agent.cmd`，Python 须加入 PATH。安装命令创建用户
 支持公网 HTTP/HTTPS 的 HTML、纯文本、Markdown；每页最大 2 MB，提取最多 20000 字符，最多 5 次重定向。可 `/状态` 查看读取进度，`/取消` 中止。网页资料仅用于分析，不作为可执行指令。不会携带微信凭据、浏览器 Cookie 或登录状态，不读取本机及内网地址。网页读取使用直连，不复用引擎代理，以便校验并固定公网连接地址。
 
 需要登录、验证码、JavaScript 渲染的页面（部分公众号和动态网站）可能只能提取部分内容或读取失败；失败时明确说明，可改发正文或截图。PDF、视频等下载链接不在网页解析范围内。
+
+
+## 多用户同时运行
+
+原来的微信绑定为 `default`，现有命令继续管理默认用户。新增用户使用独立后台进程、微信扫码绑定、会话、日志、审批和工作目录，可以与默认用户同时执行任务。每个用户自身仍一次执行一个任务。
+
+```bash
+wx-agent user add girlfriend       # 创建独立目录，让她扫码，成功后自动启动
+wx-agent user list                 # 所有用户的绑定及运行状态
+wx-agent user status girlfriend
+wx-agent user stop girlfriend
+wx-agent user start girlfriend
+wx-agent user logs girlfriend
+wx-agent --user girlfriend model   # 查看她的模型设置
+```
+
+暂时无法扫码时使用 `wx-agent user add girlfriend --no-login`，之后 `wx-agent user login girlfriend` 完成扫码并自动启动。不要让新增用户扫描默认账号的 `login --force` 二维码。再次 add 不会覆盖已有用户。
+
+新增用户复制默认用户的引擎、模型、认证方式和代理配置，共用本机 Codex/Claude 登录与 API Key 环境变量、Office Python 环境及 Whisper 模型；后续切换引擎和模型互不影响。并发使用共用账号额度和机器资源，不保证服务商不发生限流。每个用户只接收自己的审批和结果，不存在全局任务队列。
+
+这是应用层的工作区和会话分离，不是操作系统安全隔离；批准执行命令仍可能访问本机用户权限范围内的其他文件。不要将它作为不可信用户的隔离沙箱。
+
+移除时先 `wx-agent user stop girlfriend`，再 `wx-agent user remove girlfriend`。绑定和文件移入数据目录的 `removed-users`，不删除工作文件；已停止用户不会继续接收消息。升级安装包前需停止所有新增用户，升级后分别启动；`wx-agent update` 发现新增用户仍在运行会拒绝升级，不会打断她的任务。

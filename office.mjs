@@ -8,14 +8,14 @@ import {paths,privateDir} from './paths.mjs';
 import {downloadMedia,MediaError} from './media.mjs';
 const exec=promisify(execFile);
 export const OFFICE_EXTS=['.xlsx','.docx','.pptx'];
-export function officePython(env=process.env) {return env.WX_OFFICE_PYTHON || path.join(paths(env).dir,'office-runtime',process.platform==='win32'?'Scripts/python.exe':'bin/python');}
+export function officePython(env=process.env) {return env.WX_OFFICE_PYTHON || path.join(paths(env).baseDir,'office-runtime',process.platform==='win32'?'Scripts/python.exe':'bin/python');}
 export async function officeCheck(env=process.env) {
   try {await exec(officePython(env),['-c','import openpyxl,docx,pptx'],{timeout:15000,windowsHide:true});}
   catch {throw new Error('Office 环境未就绪，请在电脑运行 wx-agent office-setup（需要 Python 3）');}
 }
 export async function officeSetup() {
   const p=paths();await privateDir(p.dir);
-  if(!process.env.WX_OFFICE_PYTHON)await exec(process.env.PYTHON_BINARY || (process.platform==='win32'?'python':'python3'),['-m','venv',path.join(p.dir,'office-runtime')],{timeout:120000,windowsHide:true});
+  if(!process.env.WX_OFFICE_PYTHON)await exec(process.env.PYTHON_BINARY || (process.platform==='win32'?'python':'python3'),['-m','venv',path.join(p.baseDir,'office-runtime')],{timeout:120000,windowsHide:true});
   await exec(officePython(),['-m','pip','install','openpyxl==3.1.5','python-docx==1.2.0','python-pptx==1.0.2'],{timeout:300000,maxBuffer:4*1024*1024,windowsHide:true});
   await officeCheck();
 }
