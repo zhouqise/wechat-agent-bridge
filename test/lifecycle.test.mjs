@@ -15,12 +15,12 @@ test('平台默认数据位置与显式覆盖',()=>{
   assert.equal(paths({},'darwin','/u').dir,'/u/Library/Application Support/wx-codex');
   assert.equal(paths({},'linux','/u').dir,'/u/.local/share/wx-codex');
   assert.equal(paths({XDG_DATA_HOME:'/data'},'linux','/u').dir,'/data/wx-codex');
-  assert.equal(paths({WX_CODEX_HOME:'/primary',BRIDGE_STATE_DIR:'/old'}).dir,'/primary');
+  assert.equal(paths({WX_CODEX_HOME:'/primary',BRIDGE_STATE_DIR:'/old'},'linux','/u').dir,'/primary');
 });
 test('凭据使用私有目录和文件权限，损坏内容不回显',async t=>{
   const p=await fixture(t);await privateDir(p.dir);await writeJSON(p.session,{token:'test-only'});
-  assert.equal((await fs.stat(p.dir)).mode & 0o777,0o700);
-  assert.equal((await fs.stat(p.session)).mode & 0o777,0o600);
+  if(process.platform!=='win32')assert.equal((await fs.stat(p.dir)).mode & 0o777,0o700);
+  if(process.platform!=='win32')assert.equal((await fs.stat(p.session)).mode & 0o777,0o600);
   assert.equal((await readJSON(p.session)).token,'test-only');
   await fs.writeFile(p.session,'secret-invalid-json');
   await assert.rejects(readJSON(p.session),e=>!e.message.includes('secret-invalid-json'));
@@ -42,9 +42,18 @@ test('管理接口返回状态、拒绝未知命令并执行停止回调',async 
   const done=new Promise(resolve=>stopped=resolve);
   const server=await serve(p,()=>({pid:123,task:'空闲'}),stopped);
   t.after(()=>server.close());
-  assert.equal((await fs.stat(p.socket)).mode&0o777,0o600);
+  if(process.platform!=='win32')assert.equal((await fs.stat(p.socket)).mode&0o777,0o600);
   assert.deepEqual(await control(p),{service:'wx-codex',pid:123,task:'空闲'});
   assert.equal((await control(p,'unrecognized')).error,'unknown command');
   assert.equal((await control(p,'stop')).stopping,true);
   await done;
+});
+test('没有本机管理令牌时不能读取状态或停止服务',async t=>{
+  const p=await fixture(t);let stopped=false;
+  const server=await serve(p,()=>({pid:123}),()=>stopped=true);
+  t.after(()=>server.close());
+  const outsider={...p,controlToken:path.join(p.dir,'missing-token.json')};
+  assert.equal((await control(outsider)).error,'unauthorized');
+  assert.equal((await control(outsider,'stop')).error,'unauthorized');
+  assert.equal(stopped,false);
 });

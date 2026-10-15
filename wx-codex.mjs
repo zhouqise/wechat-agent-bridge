@@ -8,6 +8,7 @@ import {createInterface} from 'node:readline/promises';
 import {paths,privateDir,readJSON,writeJSON,alive,acquireLock,releaseLock} from './paths.mjs';
 import {control} from './service.mjs';
 import {CodexRPC} from './rpc.mjs';
+import {codexCommand} from './platform.mjs';
 
 const run=promisify(execFile), p=paths();
 const root=path.dirname(fileURLToPath(import.meta.url));
@@ -29,7 +30,7 @@ const help=`wx-codex — 在个人微信使用本机 Codex
   --version      显示版本
 
 配置和凭证独立保存，升级或卸载 npm 包不会删除它们。
-支持 macOS / Linux。未注册开机自启。`;
+支持 macOS / Linux / Windows。未注册开机自启。`;
 
 async function running() {try {const r=await control(p);return r.service==='wx-codex'?r:null;}catch{return null;}}
 async function busy() {
@@ -42,7 +43,7 @@ async function foreground(args=[]) {
 }
 async function prerequisites() {
   if(Number(process.versions.node.split('.')[0])<22)throw new Error('需要 Node.js 22 或以上版本');
-  try {const {stdout}=await run('codex',['--version'],{timeout:10000});console.log(stdout.trim());}
+  try {const command=codexCommand(['--version']);const {stdout}=await run(command.file,command.args,{timeout:10000,windowsHide:true});console.log(stdout.trim());}
   catch {throw new Error('未找到可用 Codex CLI。请先安装 Codex CLI，并执行 codex login。');}
 }
 async function doctor(config=undefined) {
@@ -55,11 +56,11 @@ async function doctor(config=undefined) {
     console.log('Codex 登录：有效（不代表模型请求已验证）');
   }finally{rpc.close();}
   const proxy=process.env.BRIDGE_CODEX_PROXY || config.codexProxy;
-  const args=['-I','--connect-timeout','8','--max-time','12','-sS','-o','/dev/null','-w','%{http_code}'];
+  const args=['-I','--connect-timeout','8','--max-time','12','-sS','-o',process.platform==='win32'?'NUL':'/dev/null','-w','%{http_code}'];
   if(proxy)args.push('--proxy',proxy);
   args.push('https://chatgpt.com/backend-api/codex/responses');
   try {
-    const {stdout}=await run('curl',args,{timeout:15000});
+    const {stdout}=await run(process.platform==='win32'?'curl.exe':'curl',args,{timeout:15000,windowsHide:true});
     if(!['200','401','405'].includes(stdout.trim()))throw new Error();
     console.log(`Codex 网络：服务可达（HTTP ${stdout.trim()}）`);
   }catch{throw new Error('Codex 网络检测未通过。请检查代理和网络；此检查需要系统 curl。');}
@@ -103,7 +104,7 @@ async function start() {
   if(!config?.workspace || !session?.token || !session?.owner)throw new Error('尚未完成配置，请执行 wx-codex setup');
   if((await fs.stat(p.log).catch(()=>({size:0}))).size>2*1024*1024)await fs.rename(p.log,p.log+'.1');
   const log=await fs.open(p.log,'a',0o600);await log.chmod(0o600);
-  const child=spawn(process.execPath,[worker,'--daemon'],{detached:true,stdio:['ignore',log.fd,log.fd],env:process.env,cwd:root});
+  const child=spawn(process.execPath,[worker,'--daemon'],{detached:true,windowsHide:true,stdio:['ignore',log.fd,log.fd],env:process.env,cwd:root});
   let failure;child.once('error',()=>{failure=true;});child.unref();await log.close();
   for(let i=0;i<100;i++) {
     await sleep(200);const state=await running();
@@ -162,12 +163,12 @@ async function migrate() {
   console.log('旧版绑定、会话和代理已导入；旧文件保留备份，工作目录未移动。');
 }
 try {
-  if(!['darwin','linux'].includes(process.platform))throw new Error('当前版本支持 macOS 和 Linux');
+  if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
   const commands={setup,start,stop,restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-codex stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.4.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.5.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-codex --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

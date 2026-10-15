@@ -7,7 +7,7 @@ import {CodexRPC} from '../rpc.mjs';
 function setup() {
   const child=new EventEmitter();child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{};
   let options;
-  const rpc=new CodexRPC({cwd:'/tmp/test',proxy:'http://127.0.0.1:7890',spawnFn:(bin,args,opts)=>{options=opts;assert.deepEqual(args,['app-server','--stdio']);return child;}});
+  const rpc=new CodexRPC({cwd:'/tmp/test',binary:'fake-codex.exe',proxy:'http://127.0.0.1:7890',spawnFn:(bin,args,opts)=>{options=opts;assert.deepEqual(args,['app-server','--stdio']);return child;}});
   return {rpc,child,options};
 }
 test('RPC 乱序响应按 ID 匹配，任务文本不进入 shell 参数', async()=>{

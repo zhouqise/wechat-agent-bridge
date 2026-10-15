@@ -13,3 +13,4 @@ running.lock*
 control.sock
 .env
 .env.*
+control-token.json

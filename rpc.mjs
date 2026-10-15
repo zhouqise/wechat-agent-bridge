@@ -1,9 +1,10 @@
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import {EventEmitter} from 'node:events';
+import {codexCommand,stopChild} from './platform.mjs';
 
 export class CodexRPC extends EventEmitter {
-  constructor({cwd, binary = 'codex', spawnFn = spawn, proxy = process.env.BRIDGE_CODEX_PROXY} = {}) {
+  constructor({cwd, binary, spawnFn = spawn, proxy = process.env.BRIDGE_CODEX_PROXY} = {}) {
     super(); this.next = 1; this.pending = new Map(); this.closed = false;
     const env = {...process.env};
     if (proxy) {
@@ -12,7 +13,8 @@ export class CodexRPC extends EventEmitter {
       env.HTTPS_PROXY = env.HTTP_PROXY = env.ALL_PROXY = proxy;
       env.https_proxy = env.http_proxy = env.all_proxy = proxy;
     }
-    this.child = spawnFn(binary, ['app-server', '--stdio'], {cwd, env, stdio: ['pipe', 'pipe', 'pipe'], shell: false});
+    const command=codexCommand(['app-server','--stdio'],{env:binary?{...env,CODEX_BINARY:binary}:env});
+    this.child = spawnFn(command.file, command.args, {cwd, env, stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide:true});
     // stderr 可能包含本机路径或工具配置，禁止直接回传微信。
     this.child.stderr.on('data', () => {});
     this.lines = createInterface({input: this.child.stdout});
@@ -49,8 +51,8 @@ export class CodexRPC extends EventEmitter {
   respond(id, result) {this.write({id, result});}
   reject(id) {this.write({id, error: {code: -32601, message: 'Unsupported client request'}});}
   async initialize() {
-    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.4.0'}});
+    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.5.0'}});
     this.write({method:'initialized', params:{}});
   }
-  close() {this.child.kill('SIGTERM'); this.fail(); this.lines.close();}
+  close() {stopChild(this.child); this.fail(); this.lines.close();}
 }

@@ -1,5 +1,13 @@
 # 更新记录
 
+## 0.5.0
+
+- 新增 Windows 用户数据目录、命名管道与后台运行支持。
+- 兼容 npm 安装的 codex.cmd，避免 shell 拼接；停止时清理 Codex 子进程树。
+- 所有平台管理接口新增随机令牌验证。
+- 新增 Windows、Linux、macOS 的 Node.js 22/24 自动化测试，以及真实后台生命周期和 npm 包安装检查。
+- 添加 PowerShell 安装说明；Windows 微信扫码和模型端到端流程仍需用户实机确认。
+
 ## 0.4.0
 
 - 支持微信截图下载解密及 Codex 图像输入，包括 PNG、JPEG、WebP。

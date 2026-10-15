@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -31,11 +31,13 @@
     "README.md",
     "LICENSE",
     "SECURITY.md",
-    "media.mjs"
+    "media.mjs",
+    "platform.mjs"
   ],
   "os": [
     "darwin",
-    "linux"
+    "linux",
+    "win32"
   ],
   "license": "MIT",
   "repository": {
