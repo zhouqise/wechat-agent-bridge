@@ -4,13 +4,14 @@
 
 <h1 align="center">WeChat Agent Bridge</h1>
 
-<p align="center"><strong>把电脑上的 AI 编程助手，带进你的微信。</strong></p>
-<p align="center">发任务 · 看结果 · 确认操作<br />连接本机 Codex / Claude Code，让文字、截图、文件和视频进入同一段对话。</p>
+<p align="center"><strong>一台电脑，多个微信用户，AI 任务同时运行。</strong></p>
+<p align="center">多人分别扫码 · 任务并行执行 · 会话与审批独立<br />让你和家人、协作者，通过各自的微信使用本机 Codex / Claude Code。</p>
 
 <p align="center">
   <a href="https://github.com/zhouqise/wechat-agent-bridge/releases/latest"><img src="https://img.shields.io/github/v/release/zhouqise/wechat-agent-bridge?style=flat-square&amp;color=10b981" alt="Latest release" /></a>
   <a href="https://github.com/zhouqise/wechat-agent-bridge/actions/workflows/test.yml"><img src="https://github.com/zhouqise/wechat-agent-bridge/actions/workflows/test.yml/badge.svg" alt="Cross-platform tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0f766e?style=flat-square" alt="MIT License" /></a>
+  <a href="#多人共享一台电脑"><img src="https://img.shields.io/badge/Multi--user-Parallel-10b981?style=flat-square" alt="Multi-user parallel tasks" /></a>
   <img src="https://img.shields.io/badge/Node.js-22%2B-334155?style=flat-square" alt="Node.js 22+" />
   <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-334155?style=flat-square" alt="macOS, Windows and Linux" />
 </p>
@@ -25,6 +26,29 @@
 </p>
 
 ---
+
+## 多人共享一台电脑
+
+**电脑端安装一次，多人分别扫码，各自发起任务。**你可以处理代码，她可以分析文档；不同用户的任务同时运行，无需等另一个用户完成。
+
+| 每个用户独立拥有 | 所有用户共用 |
+| --- | --- |
+| 微信绑定、聊天上下文与模型选择 | 电脑上安装的 Codex / Claude Code |
+| 工作目录、上传附件与生成文件 | 本机引擎登录与账号额度 |
+| 审批编号、任务进度与执行结果 | CPU、内存等机器资源 |
+
+完成基础安装后，一条命令添加用户，让对方用自己的微信扫码：
+
+```bash
+wx-agent user add teammate     # 创建工作区，扫码后自动启动
+wx-agent user list             # 查看所有用户
+wx-agent user status teammate  # 查看指定用户状态
+wx-agent user stop teammate    # 只停止指定用户
+```
+
+**不同用户可并行，每个用户一次处理一个任务。**会话、工作目录、审批和结果分别管理；引擎登录、账号额度和机器资源共用。原有账号保留为 `default`，原命令继续管理默认用户。
+
+工作区分离不等于操作系统安全隔离，获批命令仍以本机用户权限执行。添加、重新绑定、停用与归档见[多用户文档](docs/operations.md#多用户同时运行)。
 
 ## 从一条微信，开始一项任务
 
@@ -43,12 +67,12 @@
 
 | 能力 | 使用方式 |
 | --- | --- |
+| **多用户并行** | 分别扫码绑定，独立工作区、会话和审批，多个用户可以同时执行任务。 |
 | **双引擎与模型切换** | 在微信切换 Codex / Claude Code，分别保留上下文；支持本机登录和 API Key 配置。 |
 | **截图分析** | 直接发送截图，结合报错、界面和文字继续追问。 |
 | **视频画面 + 音轨分析** | 抽帧、分段离线转写，再交给模型结合分析；支持最长 30 分钟、200 MB 的 MP4。 |
 | **文档与数据处理** | 读取 PDF、Excel、Word、PPT 和常用文本附件；生成结果后通过微信取回文件。 |
 | **网页链接分析** | 提取公开网页的静态正文，支持总结、比较和来源标注。 |
-| **多用户并行** | 分别扫码绑定，独立工作区、会话和审批，多个用户可以同时执行任务。 |
 | **任务控制与审批** | 查看状态、取消任务、恢复上下文，并对需要确认的操作作单次审批。 |
 | **后台运行与升级** | 关闭终端后继续运行，使用 `wx-agent update` 检查并安装最新稳定版。 |
 
@@ -137,30 +161,18 @@ wx-agent update         # 升级到最新稳定版
 
 升级保留配置与绑定。任务执行中会拒绝升级；多用户使用时，先停止新增用户，升级后分别启动。服务管理、重新绑定和工作区迁移见[运维指南](docs/operations.md)。
 
-## 多人共享一台电脑
-
-让家人或协作者使用电脑上已安装的引擎，每个人使用自己的微信入口：
-
-```bash
-wx-agent user add teammate     # 创建工作区，扫码后自动启动
-wx-agent user list             # 查看所有用户
-wx-agent user status teammate  # 查看指定用户状态
-wx-agent user stop teammate    # 只停止指定用户
-```
-
-**不同用户可并行，每个用户一次处理一个任务。**会话、工作目录、审批和结果分别管理；引擎登录、账号额度和机器资源共用。原有账号保留为 `default`，原命令继续管理默认用户。
-
-工作区分离不等于操作系统安全隔离，获批命令仍以本机用户权限执行。添加、重新绑定、停用与归档见[多用户文档](docs/operations.md#多用户同时运行)。
-
 ## 它如何工作
 
 ```mermaid
 flowchart LR
-    W[微信私聊] <--> B[本机 Bridge]
-    B <--> C[Codex CLI]
-    B <--> A[Claude Code]
-    C --> P[当前用户工作区]
-    A --> P
+    subgraph H[同一台电脑 · 并行运行]
+      B1[用户 A 的 Bridge] <--> E1[独立引擎进程]
+      E1 --> P1[用户 A 工作区]
+      B2[用户 B 的 Bridge] <--> E2[独立引擎进程]
+      E2 --> P2[用户 B 工作区]
+    end
+    W1[用户 A 微信] <--> B1
+    W2[用户 B 微信] <--> B2
 ```
 
 每个用户运行独立 Bridge 进程，连接该用户当前选择的引擎。桥接保留会话引用和任务状态，不接管 Codex 桌面应用已有聊天。原始资料或提取内容会提交给所选模型服务；本机运行桥接不代表模型推理离线。
