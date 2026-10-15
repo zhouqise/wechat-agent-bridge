@@ -13,7 +13,7 @@
 直接在终端执行以下命令，安装 GitHub Release 中的 v0.13.1：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.13.1/wx-codex-bridge-0.13.1.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.14.0/wx-codex-bridge-0.14.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.13.1/wx-codex-bridge-0.13.1.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.14.0/wx-codex-bridge-0.14.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -129,7 +129,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.13.1/wx-codex-bridge-0.13.1.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.14.0/wx-codex-bridge-0.14.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -253,3 +253,12 @@ Windows 使用 `wx-agent.cmd`，Python 须加入 PATH。安装命令创建用户
 视频音轨使用 whisper.cpp 在本机识别。macOS 安装 `brew install whisper-cpp`；Windows/Linux 按 [whisper.cpp 官方说明](https://github.com/ggml-org/whisper.cpp) 安装 `whisper-cli`。从 [官方模型仓库](https://huggingface.co/ggerganov/whisper.cpp/tree/main) 下载多语言 `ggml-base.bin`（约 142 MiB），放到 `wx-agent paths` 数据目录下的 `models/ggml-base.bin`，或设置 `WHISPER_MODEL` 为绝对路径。`WHISPER_BINARY` 可指定可执行文件路径；Windows 使用 .exe。
 
 运行 `wx-agent media-check` 检查 FFmpeg、FFprobe、Whisper 和模型，再重启桥接。视频解析不上传原始音轨给转写服务，但抽帧与转写文字会交给当前 Codex/Claude 模型。临时音频和字幕在完成或失败后清理；处理过程中可 `/状态` 查看抽帧或转写段数，或 `/取消`。视频下载超时为 5 分钟，每段转写超时为 10 分钟；长视频可能耗时较久。累计字幕上限 12 万字符，超限或失败的段落会明确标记缺失，其余段落继续处理。没有音轨时只看画面；组件缺失、超时或转写失败时明确说明本次只分析画面，不假装已听懂。微信语音消息保持原规则：只用微信附带文字，没有文字就提示重发文字。
+
+
+## 网页链接分析
+
+在微信发送 `总结这个网页：https://example.com/article`，或一次给出最多 3 个链接进行比较。桥接读取静态网页正文并交给当前 Codex / Claude，回答标注来源。直接发送链接时默认概括内容。
+
+支持公网 HTTP/HTTPS 的 HTML、纯文本、Markdown；每页最大 2 MB，提取最多 20000 字符，最多 5 次重定向。可 `/状态` 查看读取进度，`/取消` 中止。网页资料仅用于分析，不作为可执行指令。不会携带微信凭据、浏览器 Cookie 或登录状态，不读取本机及内网地址。网页读取使用直连，不复用引擎代理，以便校验并固定公网连接地址。
+
+需要登录、验证码、JavaScript 渲染的页面（部分公众号和动态网站）可能只能提取部分内容或读取失败；失败时明确说明，可改发正文或截图。PDF、视频等下载链接不在网页解析范围内。

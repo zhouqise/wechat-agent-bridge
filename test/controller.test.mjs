@@ -99,7 +99,7 @@ test('图片失败给予反馈并释放任务，不关闭 Codex 或提交不完�
   const {controller:c,rpc,messages}=await setup();
   await c.handle('','bad',async()=>{throw new Error('图片解密失败，请重新发送截图。');});await c.starting;
   assert.equal(c.active,null);assert.equal(c.ready,true);assert.equal(rpc.calls.length,0);
-  assert.ok(messages.some(m=>m.includes('媒体处理失败')));
+  assert.ok(messages.some(m=>m.includes('内容读取失败')));
   await c.handle('','good',async()=>[{type:'image',url:'data:image/png;base64,test'}]);await c.starting;
   assert.match(rpc.calls.find(x=>x.method==='turn/start').params.input[0].text,/媒体内容或语音转写/);
 });
