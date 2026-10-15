@@ -163,7 +163,9 @@ async function engine() {
   engineName(next);
   if(!config.workspace)throw new Error('请先运行 wx-codex setup');
   await doctor({...config,engine:next});
-  const wasRunning=!!await running();if(wasRunning)await stop();
+  const current=await running();
+  if(current && current.task!=='空闲')throw new Error('任务执行中，请等待完成或在微信 /取消 后再切换引擎');
+  const wasRunning=!!current;if(wasRunning)await stop();
   await privateDir(p.dir);await acquireLock(p);
   try {await writeJSON(p.config,{...config,engine:next});}finally{await releaseLock(p);}
   console.log(`默认引擎已设置为 ${next}，两个引擎的会话独立保留。`);
