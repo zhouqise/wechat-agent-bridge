@@ -7,7 +7,7 @@ import QRCode from 'qrcode';
 import {randomUUID} from 'node:crypto';
 import {BASE, api, trustedBase, acceptBatch} from './bridge.mjs';
 import {engineName,makeController} from './engines.mjs';
-import {modelInfo,prepareModel} from './models.mjs';
+import {modelListText,modelInfo,prepareModel} from './models.mjs';
 import {imageInputs} from './media.mjs';
 
 const p = paths();
@@ -156,7 +156,7 @@ async function main() {
     };
     await selectEngine(config.engine || 'codex');
   }
-  server = await serve(p, () => ({pid:process.pid,startedAt,...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):'空闲'}), () => {void clean().finally(()=>process.exit(0));},selectModel);
+  server = await serve(p, () => ({pid:process.pid,startedAt,...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):'空闲'}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc));
   console.log('桥接已启动。微信发送 /帮助 或直接发送任务；wx-agent status 查看状态。');
   let failures = 0;
   while (true) {
@@ -171,7 +171,7 @@ async function main() {
         lastReceivedAt = Date.now();
         contextToken = msg.context_token;
         if(changing){await controller.say('配置正在变更，请稍后重试。');return;}
-        if(text==='/模型') {const info=modelInfo(config,engine);await controller.say(`当前引擎：${engine}，模型设置：${info.model || '沿用引擎默认模型'}。发送 /模型 模型名 切换。`);return;}
+        if(text==='/模型') {await controller.say(await modelListText(config,engine,controller.rpc));return;}
         if(text.startsWith('/模型 ')) {
           try {const info=await selectModel(text.slice(4).trim());await controller.say(`模型已设置为 ${info.model}，下一条任务生效；可用性由账号或服务商决定。`);}
           catch(e){await controller.say(e.message);}

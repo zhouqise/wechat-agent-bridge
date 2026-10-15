@@ -4,16 +4,16 @@
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
 
-从 v0.8.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
+从 v0.8.1 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
 
 ## 安装
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.8.0：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.8.1：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.0/wx-codex-bridge-0.8.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.1/wx-codex-bridge-0.8.1.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.0/wx-codex-bridge-0.8.0.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.1/wx-codex-bridge-0.8.1.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -125,7 +125,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.0/wx-codex-bridge-0.8.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.1/wx-codex-bridge-0.8.1.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -210,3 +210,5 @@ wx-agent.cmd start
 两个引擎分别保存模型设置，切换引擎不会覆盖另一侧的模型。运行中无需重启，新模型从下一条任务生效，保留会话上下文；停止时在终端修改则下次启动生效。任务执行中（包括审批、图片下载）禁止切换。尚未指定模型时显示“沿用引擎默认模型”，不猜测实际模型名称。
 
 切换只保存模型选择，不提前发起推理或验证账号额度；若服务商拒绝模型，请改回可用模型后重试。模型切换不会改变引擎、认证方式或 API 地址。
+
+`/模型` 和 `wx-agent model` 现在同时显示模型列表：Codex 本机模式从 app-server 获取目录；Claude 显示 CLI 常用别名 sonnet/opus（不是授权清单）。Codex API 模式提示到服务商控制台确认，不将官方目录误作第三方服务商可用模型。目录获取失败时保留当前设置，仍可输入已知 ID。

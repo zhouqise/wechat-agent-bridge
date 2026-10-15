@@ -49,7 +49,7 @@ test('微信切换双引擎保留会话，Claude 任务完成，切换失败保�
 if(process.argv.includes('--version')){if(fs.existsSync(process.env.MOCK_FAIL))process.exit(1);console.log('mock');process.exit(0);}
 createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);
 const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');
-if(m.id!==undefined)send({id:m.id,result:{}});
+if(m.id!==undefined)send({id:m.id,result:m.method==='model/list'?{data:[{model:'catalog-model'}]}:{}});
 if(m.type==='control_request')send({type:'control_response',response:{request_id:m.request_id,subtype:'success',response:{}}});
 if(m.type==='user' && !JSON.stringify(m).includes('hold-test'))send({type:'result',subtype:'success',is_error:false,result:'claude-mock'});
 });`);
@@ -68,6 +68,9 @@ return new Response(JSON.stringify({ret:0,msgs}),{headers:{'content-type':'appli
     await fs.writeFile(path.join(dir,'config.json'),JSON.stringify({workspace:path.join(dir,'workspace'),engine:'codex'}));
     await fs.writeFile(path.join(dir,'session.json'),JSON.stringify({token:'test-only',owner:'test-user',seen:[],base:'https://ilinkai.weixin.qq.com',codex:{threadId:'saved-codex'},claude:{threadId:'saved-claude'}}));
     await run('start');
+    assert.match(await run('model'),/\/模型 catalog-model/);
+    await send('/模型');
+    await waitFor(async()=>(await fs.readFile(env.MOCK_REPLIES,'utf8').catch(()=>'' )).includes('/模型 catalog-model'));
     await run('model','codex-test');
     assert.equal(JSON.parse(await run('status','--json')).model,'codex-test');
     await assert.rejects(()=>run('model','invalid model'));

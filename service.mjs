@@ -7,7 +7,7 @@ export async function control(p,command='status',params={}) {
   const token=(await readJSON(p.controlToken,{})).token;
   return new Promise((resolve,reject)=>{
     const socket=net.createConnection(p.socket);let text='';
-    const timer=setTimeout(()=>{socket.destroy();reject(new Error('管理接口超时'));},2000);
+    const timer=setTimeout(()=>{socket.destroy();reject(new Error('管理接口超时'));},command==='models'?12000:2000);
     socket.on('connect',()=>socket.write(JSON.stringify({...params,command,token})+'\n'));
     socket.on('data',buf=>{
       text+=buf.toString();
@@ -18,7 +18,7 @@ export async function control(p,command='status',params={}) {
     socket.on('close',()=>{clearTimeout(timer);reject(new Error('管理连接关闭'));});
   });
 }
-export async function serve(p,status,stop,setModel) {
+export async function serve(p,status,stop,setModel,listModels) {
   const win=p.platform==='win32';
   const token=randomBytes(32).toString('hex');
   if(!win && Buffer.byteLength(p.socket)>100)throw new Error('数据目录路径过长，请用 WX_CODEX_HOME 指定较短路径');
@@ -38,6 +38,10 @@ export async function serve(p,status,stop,setModel) {
       }catch{socket.destroy();return;}
       if(command==='status')socket.end(JSON.stringify({service:'wx-codex',...status()})+'\n');
       else if(command==='stop') {socket.end(JSON.stringify({service:'wx-codex',stopping:true})+'\n');setTimeout(stop,100);}
+      else if(command==='models' && listModels) {
+        socket.setTimeout(12000);
+        Promise.resolve().then(listModels).then(text=>socket.end(JSON.stringify({text})+'\n'),()=>socket.end('{"error":"无法获取模型目录"}\n'));
+      }
       else if(command==='model' && setModel) {
         Promise.resolve().then(()=>setModel(request.model)).then(result=>socket.end(JSON.stringify(result)+'\n'),e=>socket.end(JSON.stringify({error:e.message})+'\n'));
       }
