@@ -44,7 +44,7 @@ export async function acquireLock(p) {
     catch(e) {
       if(e.code!=='EEXIST')throw e;
       const pid=Number(await fs.readFile(p.lock,'utf8'));
-      if(alive(pid))throw new Error('已有实例或配置向导在运行，请先 wx-codex status / stop');
+      if(alive(pid))throw new Error('已有实例或配置向导在运行，请先 wx-agent status / stop');
       if(!Number.isSafeInteger(pid)||pid<2)throw new Error('锁文件损坏，请检查数据目录后处理');
       await fs.rm(p.lock,{force:true});
     }

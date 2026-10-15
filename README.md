@@ -1,21 +1,21 @@
 # WeChat Agent Bridge · 微信 AI 开发桥接
 
-在个人微信中给本机 Codex 或 Claude Code 发任务，接收结果，并确认需要审批的操作。扫码配置一次，之后在任意目录使用 `wx-codex` 命令。
+在个人微信中给本机 Codex 或 Claude Code 发任务，接收结果，并确认需要审批的操作。扫码配置一次，之后在任意目录使用 `wx-agent` 命令。
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
 
-GitHub 仓库已更名为 `wechat-agent-bridge`。为兼容已有安装，命令仍为 `wx-codex`，安装包名和用户数据目录保持不变；已安装用户无需重新安装。
+GitHub 仓库已更名为 `wechat-agent-bridge`。从 v0.6.1 起推荐使用 `wx-agent`；旧命令 `wx-codex` 作为兼容别名继续可用，两者操作同一服务、配置和会话。安装包名和用户数据目录保持不变。旧版本用户升级后即可使用新命令。
 
 ## 安装
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.6.0：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.6.1：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
-wx-codex setup
-wx-codex start
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.1/wx-codex-bridge-0.6.1.tgz --ignore-scripts
+wx-agent setup
+wx-agent start
 ```
 
 也可以下载源码，解压后进入源码目录执行 `npm install -g . --ignore-scripts`。源码安装可能链接到该目录，请保留源码；推荐普通用户使用 tgz 安装包。尚未发布到 npm，不能直接用包名从 npm 安装。
@@ -23,7 +23,7 @@ wx-codex start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.1/wx-codex-bridge-0.6.1.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -31,30 +31,30 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## 首次配置
 
-在电脑终端运行 `wx-codex setup`，依次选择引擎、认证方式（Claude）、工作目录和代理，然后用手机微信扫描终端中的二维码。如要求配对码，在电脑终端输入。
+在电脑终端运行 `wx-agent setup`，依次选择引擎、认证方式（Claude）、工作目录和代理，然后用手机微信扫描终端中的二维码。如要求配对码，在电脑终端输入。
 
 工作目录可以直接回车，使用独立空白工作区。只有需要操作实际项目时才填写该项目的完整路径；每条微信消息无需指定目录。代理需要填写完整地址，例如 `http://127.0.0.1:7890`；无代理直接回车。输入 `direct` 可以清除旧代理。代理只传给所选引擎的子进程及相应连接检查。
 
-配置向导检查所选 CLI 和认证配置，Codex 额外检查网络可达性，不会发起模型任务。微信绑定完成后执行 `wx-codex start`。首次可向机器人发送“不要调用工具，只回复：微信 Codex 已连通”验证完整链路。
+配置向导检查所选 CLI 和认证配置，Codex 额外检查网络可达性，不会发起模型任务。微信绑定完成后执行 `wx-agent start`。首次可向机器人发送“不要调用工具，只回复：微信 Codex 已连通”验证完整链路。
 
 ## 日常使用
 
 以下命令可以在任意目录执行：
 
 ```sh
-wx-codex start       # 后台启动，可关闭终端
-wx-codex status      # 查看连接、工作目录和任务状态
-wx-codex stop        # 停止桥接，向 Codex 子进程发送终止信号
-wx-codex restart     # 重启
-wx-codex logs        # 最近日志
-wx-codex logs --follow
-wx-codex doctor     # 检查 CLI 登录和网络
-wx-codex paths      # 查看数据保存位置
+wx-agent start       # 后台启动，可关闭终端
+wx-agent status      # 查看连接、工作目录和任务状态
+wx-agent stop        # 停止桥接，终止当前引擎子进程
+wx-agent restart     # 重启
+wx-agent logs        # 最近日志
+wx-agent logs --follow
+wx-agent doctor     # 检查 CLI 登录和网络
+wx-agent paths      # 查看数据保存位置
 ```
 
-`wx-codex engine` 查看默认引擎；`wx-codex engine claude` 或 `wx-codex engine codex` 切换，若后台运行会重启。切换前请等待任务完成。
+`wx-agent engine` 查看默认引擎；`wx-agent engine claude` 或 `wx-agent engine codex` 切换，若后台运行会重启。切换前请等待任务完成。
 
-`wx-codex run` 为前台运行模式，Ctrl+C 停止。后台运行不等于开机自启：重启电脑后需执行 `wx-codex start`；电脑须保持唤醒和联网。进程异常退出不会自动重启。停止前建议在微信取消或等待当前任务完成。
+`wx-agent run` 为前台运行模式，Ctrl+C 停止。后台运行不等于开机自启：重启电脑后需执行 `wx-agent start`；电脑须保持唤醒和联网。进程异常退出不会自动重启。停止前建议在微信取消或等待当前任务完成。
 
 | 微信消息 | 功能 |
 | --- | --- |
@@ -74,11 +74,11 @@ wx-codex paths      # 查看数据保存位置
 
 ## 工作区、升级与恢复
 
-更换项目：先 `wx-codex stop`，再 `wx-codex setup` 选择新目录，最后 `wx-codex start`。目录变更会清空桥接使用的旧会话引用，工作文件不删除。普通重启会保留上下文，但不会自动重跑中断的任务。
+更换项目：先 `wx-agent stop`，再 `wx-agent setup` 选择新目录，最后 `wx-agent start`。目录变更会清空桥接使用的旧会话引用，工作文件不删除。普通重启会保留上下文，但不会自动重跑中断的任务。
 
 升级：停止后安装新的 tgz，再启动。配置与凭据独立于安装目录，不受包更新影响。旧版 0.2 用户需停止旧进程，在旧源码目录运行 `node wx-codex.mjs migrate`，导入绑定、代理和会话；旧工作区和旧状态文件保留。安装包中不包含任何人的配置或凭据。
 
-微信登录过期：`wx-codex stop` → `wx-codex login --force` → `wx-codex start`。强制登录会将旧会话保存为 `session.json.backup`，重新扫码会建立新绑定及新上下文。
+微信登录过期：`wx-agent stop` → `wx-agent login --force` → `wx-agent start`。强制登录会将旧会话保存为 `session.json.backup`，重新扫码会建立新绑定及新上下文。
 
 默认数据目录：
 
@@ -90,7 +90,7 @@ wx-codex paths      # 查看数据保存位置
 
 `status --json` 提供机器可读状态。“本机适配器已就绪”不等于远端模型一定可用；“最近成功轮询”用于判断微信连接是否更新。`doctor` 的 HTTP 检测可能受防火墙影响，不代替实际任务验证。
 
-卸载：先停止，再 `npm uninstall -g wx-codex-bridge`（自定义 prefix 安装须带相同 prefix）。用户数据会保留，可根据 `wx-codex paths` 先记下位置再自行清理。不要把数据目录作为公开仓库上传。
+卸载：先停止，再 `npm uninstall -g wx-codex-bridge`（自定义 prefix 安装须带相同 prefix）。用户数据会保留，可根据 `wx-agent paths` 先记下位置再自行清理。不要把数据目录作为公开仓库上传。
 
 ## 开发和验证
 
@@ -125,13 +125,13 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.0/wx-codex-bridge-0.6.0.tgz --ignore-scripts
-wx-codex.cmd setup
-wx-codex.cmd start
-wx-codex.cmd status
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.1/wx-codex-bridge-0.6.1.tgz --ignore-scripts
+wx-agent.cmd setup
+wx-agent.cmd start
+wx-agent.cmd status
 ```
 
-显式使用 `.cmd` 可避免 PowerShell 的脚本执行策略阻止 npm 生成的 `.ps1` 文件，无需修改系统执行策略。停止、重启、日志分别是 `wx-codex.cmd stop`、`wx-codex.cmd restart`、`wx-codex.cmd logs`。后台启动后可以关闭终端，注销或重启 Windows 后需要再次启动；暂不注册 Windows 服务或开机计划任务。
+显式使用 `.cmd` 可避免 PowerShell 的脚本执行策略阻止 npm 生成的 `.ps1` 文件，无需修改系统执行策略。停止、重启、日志分别是 `wx-agent.cmd stop`、`wx-agent.cmd restart`、`wx-agent.cmd logs`。后台启动后可以关闭终端，注销或重启 Windows 后需要再次启动；暂不注册 Windows 服务或开机计划任务。
 
 配置向导中工作区填写完整路径，例如 `D:\Projects\demo`，路径包含空格和中文也可使用。请填写原始路径，不要在输入值外额外加引号。建议保留默认用户数据目录，不要把凭据目录放在共享盘中。Windows 使用用户目录继承的 NTFS 权限；POSIX 的 0700/0600 不能代替 Windows ACL。
 
@@ -143,29 +143,29 @@ wx-codex.cmd status
 
 桥接直接调用用户自行安装的 Claude Code CLI，不提供第三方登录服务，不读取或复制登录令牌。两种认证方式都支持：
 
-- `local`：由 Claude Code 自己加载用户级配置和已有认证。先在电脑运行 `claude auth login`，然后 `wx-codex setup` 选择 `claude` → `local`。
-- `api`：只读取启动进程环境中的 `ANTHROPIC_API_KEY`，不加载 Claude 用户级设置，也不回退到本机登录。先设置环境变量，再 `wx-codex setup` 选择 `claude` → `api`。API 使用独立额度/计费，密钥不写入桥接配置或微信状态。
+- `local`：由 Claude Code 自己加载用户级配置和已有认证。先在电脑运行 `claude auth login`，然后 `wx-agent setup` 选择 `claude` → `local`。
+- `api`：只读取启动进程环境中的 `ANTHROPIC_API_KEY`，不加载 Claude 用户级设置，也不回退到本机登录。先设置环境变量，再 `wx-agent setup` 选择 `claude` → `api`。API 使用独立额度/计费，密钥不写入桥接配置或微信状态。
 
 macOS/Linux 可通过隐藏输入设置本次终端的 API Key：
 
 ```sh
 read -r -s ANTHROPIC_API_KEY
 export ANTHROPIC_API_KEY
-wx-codex setup
-wx-codex start
+wx-agent setup
+wx-agent start
 ```
 
 Windows PowerShell 可用：
 
 ```powershell
 $env:ANTHROPIC_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'API Key' -AsSecureString)).Password
-wx-codex.cmd setup
-wx-codex.cmd start
+wx-agent.cmd setup
+wx-agent.cmd start
 ```
 
 不要把真实密钥贴进微信、issue 或聊天。环境变量仅随当前终端及子进程生效；从另一个终端重启 API 模式时需要重新提供。`ANTHROPIC_BASE_URL` 等环境配置由 Claude Code 本身处理；桥接不会替你把凭据复制到其他服务。
 
-使用 `wx-codex doctor --engine claude` 检查本机 CLI/认证配置；该检查不提交模型请求，不能证明 API Key 有效。`CLAUDE_BINARY` 可指定 Claude 原生程序或 npm 的 `cli.js`。Windows 下兼容 `claude.exe`、新版 npm 包的 `bin/claude.exe` 及旧版 `claude.cmd` 启动器；安装 Claude 本身不要使用 `--ignore-scripts`，它需要官方 postinstall 安装原生程序（桥接包安装仍可使用 `--ignore-scripts`）；安装和认证可按官方安装文档操作，npm 用户可执行 `npm.cmd install -g @anthropic-ai/claude-code`、`claude.cmd auth login`。
+使用 `wx-agent doctor --engine claude` 检查本机 CLI/认证配置；该检查不提交模型请求，不能证明 API Key 有效。`CLAUDE_BINARY` 可指定 Claude 原生程序或 npm 的 `cli.js`。Windows 下兼容 `claude.exe`、新版 npm 包的 `bin/claude.exe` 及旧版 `claude.cmd` 启动器；安装 Claude 本身不要使用 `--ignore-scripts`，它需要官方 postinstall 安装原生程序（桥接包安装仍可使用 `--ignore-scripts`）；安装和认证可按官方安装文档操作，npm 用户可执行 `npm.cmd install -g @anthropic-ai/claude-code`、`claude.cmd auth login`。
 
 微信发送 `/引擎 claude` 即可使用 Claude，`/引擎 codex` 切回。切换只允许在任务空闲时进行；切换失败会保留原引擎。两个引擎分别保存会话和最近结果，`/新会话` 只重置当前引擎。任务不会自动同时发给两个引擎。
 

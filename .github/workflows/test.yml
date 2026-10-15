@@ -36,6 +36,8 @@ jobs:
       - name: Verify installable package
         run: |
           npm pack
-          npm install -g ./wx-codex-bridge-0.6.0.tgz --ignore-scripts
+          npm install -g ./wx-codex-bridge-0.6.1.tgz --ignore-scripts
+          wx-agent --version
+          wx-agent --help
           wx-codex --version
           wx-codex --help

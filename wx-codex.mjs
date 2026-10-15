@@ -16,13 +16,13 @@ const run=promisify(execFile), p=paths();
 const root=path.dirname(fileURLToPath(import.meta.url));
 const worker=path.join(root,'cli.mjs');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const help=`wx-codex — 在个人微信使用本机 Codex / Claude Code
+const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
 
   setup          首次配置：环境检查、工作目录、代理、微信扫码
   start          后台启动，关闭终端仍运行
-  stop           停止桥接及其 Codex 子进程
+  stop           停止桥接及其引擎子进程
   restart        停止后重新启动
-  status         查看进程、微信、Codex 和任务状态
+  status         查看进程、微信、引擎和任务状态
   logs           查看最近日志（logs --follow 持续查看）
   doctor         检查当前引擎（--engine claude 或 codex）
   engine [名称]  查看或切换默认引擎，保留独立会话
@@ -32,6 +32,7 @@ const help=`wx-codex — 在个人微信使用本机 Codex / Claude Code
   paths          显示数据目录
   --version      显示版本
 
+兼容旧命令 wx-codex，两者使用相同配置和会话。
 配置和凭证独立保存，升级或卸载 npm 包不会删除它们。
 支持 macOS / Linux / Windows。未注册开机自启。`;
 
@@ -84,8 +85,8 @@ async function doctor(config=undefined) {
   }catch{throw new Error('Codex 网络检测未通过。请检查代理和网络；此检查需要系统 curl。');}
 }
 async function setup() {
-  if(await busy())throw new Error('请先 wx-codex stop，再修改配置');
-  if(!process.stdin.isTTY)throw new Error('setup 需要交互式终端，请在电脑终端运行 wx-codex setup');
+  if(await busy())throw new Error('请先 wx-agent stop，再修改配置');
+  if(!process.stdin.isTTY)throw new Error('setup 需要交互式终端，请在电脑终端运行 wx-agent setup');
   await privateDir(p.dir);
   const old=await readJSON(p.config,{});
   const rl=createInterface({input:process.stdin,output:process.stdout});
@@ -121,24 +122,24 @@ async function setup() {
   console.log('配置已保存，正在检查当前引擎……');
   await doctor(config);
   await foreground(['--login']);
-  console.log('配置完成！现在执行 wx-codex start 即可。');
+  console.log('配置完成！现在执行 wx-agent start 即可。');
 }
 async function start() {
   await privateDir(p.dir);
   const previous=await running();if(previous){console.log(`已经运行（PID ${previous.pid}），无需重复启动。`);return;}
-  if(await busy())throw new Error('已有进程正在启动或配置，请稍后执行 wx-codex status');
+  if(await busy())throw new Error('已有进程正在启动或配置，请稍后执行 wx-agent status');
   const config=await readJSON(p.config,null),session=await readJSON(p.session,null);
-  if(!config?.workspace || !session?.token || !session?.owner)throw new Error('尚未完成配置，请执行 wx-codex setup');
+  if(!config?.workspace || !session?.token || !session?.owner)throw new Error('尚未完成配置，请执行 wx-agent setup');
   if((await fs.stat(p.log).catch(()=>({size:0}))).size>2*1024*1024)await fs.rename(p.log,p.log+'.1');
   const log=await fs.open(p.log,'a',0o600);await log.chmod(0o600);
   const child=spawn(process.execPath,[worker,'--daemon'],{detached:true,windowsHide:true,stdio:['ignore',log.fd,log.fd],env:process.env,cwd:root});
   let failure;child.once('error',()=>{failure=true;});child.unref();await log.close();
   for(let i=0;i<100;i++) {
     await sleep(200);const state=await running();
-    if(state){console.log(`已后台启动（PID ${state.pid}）。可关闭终端。\n状态：wx-codex status\n停止：wx-codex stop`);return;}
-    if(failure || (child.pid && !alive(child.pid)))throw new Error('后台启动失败，请执行 wx-codex logs 查看原因');
+    if(state){console.log(`已后台启动（PID ${state.pid}）。可关闭终端。\n状态：wx-agent status\n停止：wx-agent stop`);return;}
+    if(failure || (child.pid && !alive(child.pid)))throw new Error('后台启动失败，请执行 wx-agent logs 查看原因');
   }
-  throw new Error('后台启动仍未就绪。请执行 wx-codex status / logs 查看；不要重复启动。');
+  throw new Error('后台启动仍未就绪。请执行 wx-agent status / logs 查看；不要重复启动。');
 }
 async function stop() {
   const current=await running();
@@ -148,7 +149,7 @@ async function stop() {
   }
   await control(p,'stop');
   for(let i=0;i<60;i++){await sleep(200);if(!await running() && !await busy()){console.log('已停止。');return;}}
-  throw new Error('停止尚未确认，请稍后执行 wx-codex status');
+  throw new Error('停止尚未确认，请稍后执行 wx-agent status');
 }
 async function status() {
   const state=await running();
@@ -161,7 +162,7 @@ async function engine() {
   const next=process.argv[3];
   if(!next){console.log(`当前默认引擎：${config.engine || 'codex'}`);return;}
   engineName(next);
-  if(!config.workspace)throw new Error('请先运行 wx-codex setup');
+  if(!config.workspace)throw new Error('请先运行 wx-agent setup');
   await doctor({...config,engine:next});
   const current=await running();
   if(current && current.task!=='空闲')throw new Error('任务执行中，请等待完成或在微信 /取消 后再切换引擎');
@@ -208,9 +209,9 @@ try {
   if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
   const commands={setup,start,stop,engine,restart:async()=>{await stop();await start();},status,logs,doctor,
-    login:async()=>{if(await busy())throw new Error('请先 wx-codex stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
+    login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.6.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
-  if(!commands[command])throw new Error('未知命令，请执行 wx-codex --help');
+    '--version':async()=>console.log('0.6.1'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+  if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

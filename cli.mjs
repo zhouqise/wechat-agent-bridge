@@ -81,7 +81,7 @@ async function login() {
       case 'scaned_but_redirect':
         base = trustedBase(`https://${result.redirect_host}`); break;
       case 'need_verifycode': {
-        if (!process.stdin.isTTY) throw new Error('需要手机配对码：请在本机终端运行 wx-codex login 后输入，不要在聊天中发送验证码');
+        if (!process.stdin.isTTY) throw new Error('需要手机配对码：请在本机终端运行 wx-agent login 后输入，不要在聊天中发送验证码');
         const rl = createInterface({input: process.stdin, output: process.stdout});
         code = (await rl.question('请输入手机显示的配对数字：')).trim(); rl.close(); break;
       }
@@ -106,11 +106,11 @@ async function main() {
   let state;
   try {state = JSON.parse(await fs.readFile(sessionPath, 'utf8'));}
   catch (e) {if (e.code !== 'ENOENT') throw new Error('状态文件无法读取，请先检查备份');}
-  if (!state && process.argv.includes('--daemon')) throw new Error('尚未绑定微信，请运行 wx-codex setup');
+  if (!state && process.argv.includes('--daemon')) throw new Error('尚未绑定微信，请运行 wx-agent setup');
   if (!state) state = await login();
   if (!state.token || !state.owner || !Array.isArray(state.seen)) throw new Error('登录状态不完整');
   trustedBase(state.base);
-  if (process.argv.includes('--login')) {console.log('微信已绑定。运行 wx-codex start 即可后台启动。');return;}
+  if (process.argv.includes('--login')) {console.log('微信已绑定。运行 wx-agent start 即可后台启动。');return;}
   const echo = process.argv.includes('--echo');
   let contextToken,config,cwd,engine='codex';
   let selectEngine;
@@ -146,7 +146,7 @@ async function main() {
     await selectEngine(config.engine || 'codex');
   }
   server = await serve(p, () => ({pid:process.pid,startedAt,mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):'空闲'}), () => {void clean().finally(()=>process.exit(0));});
-  console.log('桥接已启动。微信发送 /帮助 或直接发送任务；wx-codex status 查看状态。');
+  console.log('桥接已启动。微信发送 /帮助 或直接发送任务；wx-agent status 查看状态。');
   let failures = 0;
   while (true) {
     try {
@@ -166,7 +166,7 @@ async function main() {
           if(!['codex','claude'].includes(next)){await controller.say('请使用 /引擎 codex 或 /引擎 claude');return;}
           if(next===engine){await controller.say(`当前已经是 ${engine}。`);return;}
           try {await selectEngine(next,true);await controller.say(`已切换到 ${engine}，该引擎的会话独立保留。`);}
-          catch {await controller.say('引擎切换失败，仍保留原引擎。请在电脑上用 wx-codex doctor --engine '+next+' 检查安装及认证配置。');}
+          catch {await controller.say('引擎切换失败，仍保留原引擎。请在电脑上用 wx-agent doctor --engine '+next+' 检查安装及认证配置。');}
           return;
         }
         const items=msg.item_list ?? [];
