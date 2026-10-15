@@ -14,8 +14,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "qrcode": "1.5.4",
-    "silk-wasm": "3.7.1"
+    "qrcode": "1.5.4"
   },
   "description": "微信连接本机 Codex / Claude Code：双引擎切换、截图分析、审批与后台管理",
   "bin": {

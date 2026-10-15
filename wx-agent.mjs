@@ -28,7 +28,7 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
   logs           查看最近日志（logs --follow 持续查看）
   doctor         检查当前引擎（--engine claude 或 codex）
   engine [名称]  查看或切换默认引擎，保留独立会话
-  media-check    检查语音/视频离线组件与模型
+  media-check    检查视频抽帧组件
   model [模型名] 查看或切换当前引擎模型
   login          交互式微信扫码（login --force 重新绑定）
   run            前台运行，Ctrl+C 停止
@@ -213,13 +213,11 @@ async function model() {
   }finally{await releaseLock(p);}
 }
 async function mediaCheck() {
-  for(const [label,binary] of [['FFmpeg',process.env.FFMPEG_BINARY || 'ffmpeg'],['FFprobe',process.env.FFPROBE_BINARY || 'ffprobe'],['Whisper',process.env.WHISPER_BINARY || 'whisper-cli']]) {
+  for(const [label,binary] of [['FFmpeg',process.env.FFMPEG_BINARY || 'ffmpeg'],['FFprobe',process.env.FFPROBE_BINARY || 'ffprobe']]) {
     try {await run(binary,[label==='Whisper'?'-h':'-version'],{timeout:10000,windowsHide:true});console.log(label+'：已安装');}
     catch{throw new Error(label+' 不可用，请按 README 安装或配置可执行文件路径');}
   }
-  const model=process.env.WHISPER_MODEL || path.join(p.dir,'models','ggml-base.bin');
-  if(!await fs.stat(model).then(s=>s.isFile(),()=>false))throw new Error('缺少识别模型，请按 README 下载或设置 WHISPER_MODEL');
-  console.log('离线模型：已配置；支持语音转写与 MP4 视频抽帧。');
+  console.log('视频抽帧组件已就绪；语音只使用微信附带的转文字，不做本机识别。');
 }
 async function logs() {
   let position=0;
