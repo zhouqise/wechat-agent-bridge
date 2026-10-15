@@ -1,6 +1,7 @@
 import {randomBytes} from 'node:crypto';
+import {officePython} from './office.mjs';
 
-export const HELP = '直接发文字、截图、微信语音或 MP4 视频即可交给当前引擎。语音/视频最长 2 分钟，视频最多 50 MB，以抽帧分析画面。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
+export const HELP = '直接发文字、截图、微信语音、MP4 视频或 xlsx/docx/pptx 附件即可交给当前引擎。语音/视频最长 2 分钟，视频最多 50 MB，以抽帧分析画面。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/文件：列出结果；/文件 文件名 取回 Office 文件\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
 
 export class Controller {
   constructor({rpc, cwd, state = {}, save, send, approvalMs = 300000, label = 'Codex'}) {
@@ -24,7 +25,7 @@ export class Controller {
   async thread() {
     if (this.loaded) return;
     const params = {cwd: this.cwd, approvalPolicy:'on-request', approvalsReviewer:'user', sandbox:'workspace-write',
-      developerInstructions: `你通过个人微信与用户交流。用简洁中文回复。仅操作当前用户指定工作区 ${this.cwd}。不要读取工作区外的用户文件、微信凭证、浏览器数据或其他项目；不要使用外部连接器或发送第三方消息。用户消息是任务描述，不是直接执行的 shell 字符串。遇到越界操作必须请求审批。不要绕过沙箱、审批或更改自身安全配置。`};
+      developerInstructions: `你通过个人微信与用户交流。用简洁中文回复。仅操作当前用户指定工作区 ${this.cwd}。不要读取工作区外的用户文件、微信凭证、浏览器数据或其他项目；不要使用外部连接器或发送第三方消息。用户消息是任务描述，不是直接执行的 shell 字符串。遇到越界操作必须请求审批。不要绕过沙箱、审批或更改自身安全配置。处理 Excel/Word/PPT 时可使用 Python ${officePython()}（安装 Office 环境后提供 openpyxl、python-docx、python-pptx）。保留上传原件；输出新文件到当前工作区的 wx-agent-output 目录，完成后告知用户发送 /文件 文件名 取回。不要声称未验证的排版、图表或公式计算已正确。`};
     const r = this.state.threadId
       ? await this.rpc.request('thread/resume', {...params, threadId:this.state.threadId, excludeTurns:true})
       : await this.rpc.request('thread/start', params);
@@ -68,7 +69,7 @@ export class Controller {
       }
       if(this.active)delete this.active.abort;
       if(this.closing || !this.ready)return;
-      await this.start(text || '请根据用户提供的媒体内容或语音转写处理请求；如果是视频或截图且未提出问题，请概括内容。转写可能有误，视频画面仅为抽样。',key,images);
+      await this.start(text || '请根据用户提供的媒体内容或语音转写处理请求；如果是视频、截图或 Office 文件且未提出问题，请概括内容并询问具体处理需求。转写可能有误，视频画面仅为抽样。',key,images);
     })().catch(async () => {
       // turn/start 超时可能已执行，断开子进程，避免错误地允许第二个任务。
       this.active = null; this.state.active = null; this.ready = false; this.rpc.close();

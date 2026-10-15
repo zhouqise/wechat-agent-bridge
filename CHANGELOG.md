@@ -1,5 +1,11 @@
 # 更新记录
 
+## 0.10.0
+
+- 支持接收 xlsx/docx/pptx，提取内容并保留独立原件。
+- 新增 office-setup / office-check，独立 Python 环境提供 Office 编辑库。
+- 新增 /文件 查看和回传输出目录中的 Office 结果；限制大小与路径，失败不自动重发。
+
 ## 0.9.1
 
 - Claude /模型 从 CLI 初始化响应读取模型目录，失败时才显示备用别名。

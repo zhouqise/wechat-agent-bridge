@@ -4,16 +4,16 @@
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
 
-从 v0.9.1 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
+从 v0.10.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
 
 ## 安装
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.9.1：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.10.0：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.1/wx-codex-bridge-0.9.1.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.10.0/wx-codex-bridge-0.10.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.1/wx-codex-bridge-0.9.1.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.10.0/wx-codex-bridge-0.10.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -70,7 +70,7 @@ wx-agent paths      # 查看数据保存位置
 | `/拒绝 编号` | 拒绝操作 |
 | `/回答 编号 内容` | 回答非敏感问题 |
 
-同一时间只执行一个任务，忙碌时新任务不排队。当前处理绑定用户的私聊文字、图片、微信语音和 MP4 视频，不处理群聊或普通文件附件；不接管 Codex 桌面应用已有聊天。回复最多显示 16000 字，完整最近结果保存在本机状态中。
+同一时间只执行一个任务，忙碌时新任务不排队。当前处理绑定用户的私聊文字、图片、微信语音和 MP4 视频，不处理群聊；Office 附件支持见下方说明；不接管 Codex 桌面应用已有聊天。回复最多显示 16000 字，完整最近结果保存在本机状态中。
 
 ## 工作区、升级与恢复
 
@@ -125,7 +125,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.1/wx-codex-bridge-0.9.1.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.10.0/wx-codex-bridge-0.10.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -224,3 +224,22 @@ wx-agent.cmd start
 处理期间可以 `/状态`、`/取消`。临时视频和帧文件在完成、失败或正常停止后删除；微信转写文字和视频抽样画面交给所选模型服务，可能保存在该引擎会话记录中。无须语音识别 API Key 或离线模型。
 
 Claude 的 `/模型` 现在从 CLI 初始化响应读取真实模型目录，支持 `sonnet[1m]` 等带上下文后缀的名称。列表仍由 CLI/服务配置决定，不保证账号额度。显示的“最近任务实际模型”来自最近一次任务的 system/init 事件；尚无任务或刚切换模型时明确显示未确认，不将别名猜测为实际模型。目录查询不会发送用户任务，不修改已有会话，独立查询进程在完成或超时后退出。
+
+## Excel、Word、PPT
+
+支持直接发送 `.xlsx`、`.docx`、`.pptx` 文件（每条一份、最大 20 MB）。收到后提取文字、表格、单元格和公式供当前引擎阅读；你可以再发送“汇总销售额”“修改这份文档”“调整第三页文案”等任务。Codex 和 Claude 都可以使用独立 Python 环境中的 openpyxl、python-docx、python-pptx 编辑或生成文件，工具执行仍遵守原审批规则。
+
+首次使用需安装 Python 3（建议 3.10+），然后在本机执行：
+
+```sh
+wx-agent office-setup
+wx-agent office-check
+```
+
+Windows 使用 `wx-agent.cmd`，Python 须加入 PATH。安装命令创建用户数据目录中的独立环境，不修改系统 Python 包；需要网络下载依赖。可用 PYTHON_BINARY 指定创建环境的 Python，可用 WX_OFFICE_PYTHON 指定已有且包含上述库的 Python（office-setup 会在指定环境安装依赖）。
+
+输入原件与提取文字保存在当前工作区的 `wx-agent-input` 下，每次创建独立目录；结果另存到 `wx-agent-output`。这些文件会保留，用户可按需清理。微信发送 `/文件` 查看结果，发送 `/文件 文件名.xlsx`（或 docx/pptx）回传文件；仅允许输出目录中的普通 Office 文件，不允许目录穿越、符号链接、硬链接或大于 20 MB 的结果。未确认发送成功时不会自动重发。
+
+暂不支持旧版 `.xls/.doc/.ppt`、宏文件、加密文档、PDF 或其他附件；请先转换为上述格式。解析还限制解压总量 80 MB、条目数 5000、单条目 16 MB，以避免异常压缩文件。大文档只提取部分内容，模型需要时可读取原文件。
+
+提取内容不等于可视化预览：图表、嵌入图片、复杂版式不保证完整识别；Excel 公式由库保留/编辑，但不会像 Excel 那样重新计算。修改后的复杂样式或特殊对象需要用户在 Office 中复核。桥接不自动执行宏，不跟随外部链接；模型处理文件仍需遵循审批。文件内容和提取文字会提交给选中的模型服务。

@@ -14,3 +14,7 @@ control.sock
 .env
 .env.*
 control-token.json
+
+wx-agent-input/
+wx-agent-output/
+__pycache__/

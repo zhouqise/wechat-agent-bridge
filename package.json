@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -37,7 +37,10 @@
     "engines.mjs",
     "codex-config.mjs",
     "models.mjs",
-    "av.mjs"
+    "av.mjs",
+    "office.mjs",
+    "office_tool.py",
+    "file-send.mjs"
   ],
   "os": [
     "darwin",
