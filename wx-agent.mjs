@@ -15,6 +15,8 @@ import {codexCommand,claudeCommand} from './platform.mjs';
 import {ClaudeRPC} from './claude.mjs';
 import {updatePackage,updateFetcher} from './update.mjs';
 import {userNames,provisionUser,requireUser,profileState,archiveUser} from './users.mjs';
+import {projectList,addProject,projectName} from './projects.mjs';
+import {ocrCheck,ocrSetup} from './ocr.mjs';
 import {engineName} from './engines.mjs';
 
 const userFlag=process.argv.indexOf('--user');
@@ -39,6 +41,9 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
   logs           查看最近日志（logs --follow 持续查看）
   doctor         检查当前引擎（--engine claude 或 codex）
   engine [名称]  查看或切换默认引擎，保留独立会话
+  project list/add/remove  管理本用户可切换的项目（修改需停止服务）
+  ocr-setup      安装 OCR Python 组件（另需 Tesseract 中英文语言包）
+  ocr-check      检查图片和扫描 PDF 的 OCR 环境
   office-setup   安装独立 Office 处理环境（需要 Python 3）
   office-check   检查 PDF/Excel/Word/PPT 处理环境
   media-check    检查视频抽帧、音轨识别组件与模型
@@ -51,6 +56,19 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
 
 配置和凭证独立保存，升级或卸载 npm 包不会删除它们。
 支持 macOS / Linux / Windows。未注册开机自启。`;
+
+async function project(){
+  const [action='list',name,dir,...extra]=process.argv.slice(3);
+  if(action==='list'){const c=await readJSON(p.config,{});for(const [n,d] of Object.entries(projectList(c,p.workspace)))console.log(`${n=== (c.currentProject || 'default')?'*':' '} ${n}: ${d}`);return;}
+  if(!['add','remove'].includes(action) || extra.length)throw Error('用法：project list | project add 名称 完整目录 | project remove 名称');
+  await privateDir(p.dir);await acquireLock(p);
+  try{
+    let c=await readJSON(p.config,{});
+    if(action==='add')c=await addProject(c,name,dir);
+    else{projectName(name);if(name==='default')throw Error('不能移除默认项目');if(dir)throw Error('用法：project remove 名称');c.projects={...c.projects};delete c.projects[name];if(c.currentProject===name)c.currentProject='default';}
+    await writeJSON(p.config,c);console.log('项目配置已保存。启动后微信发送 /项目 查看。');
+  }finally{await releaseLock(p);}
+}
 
 async function user() {
   if(p.user)throw Error('user 管理命令请勿同时指定 --user');
@@ -173,9 +191,9 @@ async function setup() {
   await acquireLock(p);
   try {
     const session=await readJSON(p.session,null);
-    if(session && old.workspace===config.workspace && ['codexAuth','codexBaseUrl','codexModel','codexApiKeyEnv'].some(k=>old[k]!==config[k])) {session.codex={workspace:config.workspace};await writeJSON(p.session,session);}
+    if(session && old.workspace===config.workspace && ['codexAuth','codexBaseUrl','codexModel','codexApiKeyEnv'].some(k=>old[k]!==config[k])) {session.codex={workspace:config.workspace};for(const slot of Object.values(session.projectSessions || {}))delete slot.codex;await writeJSON(p.session,session);}
     if(session && old.workspace!==config.workspace) {
-      session.codex={workspace:config.workspace};session.claude={workspace:config.workspace};await writeJSON(p.session,session);
+      session.codex={workspace:config.workspace};session.claude={workspace:config.workspace};config.currentProject='default';await writeJSON(p.session,session);
       console.log('工作目录变化，已为新目录清空会话引用，原工作文件未删除。');
     }
     await writeJSON(p.config,config);
@@ -320,10 +338,10 @@ async function migrate() {
 try {
   if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
-  const commands={setup,start,stop,update,user,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('PDF / Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
+  const commands={project,'ocr-check':async()=>{await ocrCheck();console.log('OCR 环境已就绪（中英文）。');},'ocr-setup':async()=>{await ocrSetup();console.log('OCR 环境已就绪。');},setup,start,stop,update,user,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('PDF / Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.16.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.17.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

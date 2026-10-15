@@ -46,7 +46,7 @@ wx-agent user status teammate  # 查看指定用户状态
 wx-agent user stop teammate    # 只停止指定用户
 ```
 
-**不同用户可并行，每个用户一次处理一个任务。**会话、工作目录、审批和结果分别管理；引擎登录、账号额度和机器资源共用。原有账号保留为 `default`，原命令继续管理默认用户。
+**不同用户可并行，每个用户依次处理队列中的任务。**会话、工作目录、审批和结果分别管理；引擎登录、账号额度和机器资源共用。原有账号保留为 `default`，原命令继续管理默认用户。
 
 工作区分离不等于操作系统安全隔离，获批命令仍以本机用户权限执行。添加、重新绑定、停用与归档见[多用户文档](docs/operations.md#多用户同时运行)。
 
@@ -71,8 +71,10 @@ wx-agent user stop teammate    # 只停止指定用户
 | **双引擎与模型切换** | 在微信切换 Codex / Claude Code，分别保留上下文；支持本机登录和 API Key 配置。 |
 | **截图分析** | 直接发送截图，结合报错、界面和文字继续追问。 |
 | **视频画面 + 音轨分析** | 抽帧、分段离线转写，再交给模型结合分析；支持最长 30 分钟、200 MB 的 MP4。 |
-| **文档与数据处理** | 读取 PDF、Excel、Word、PPT 和常用文本附件；生成结果后通过微信取回文件。 |
+| **文档与数据处理** | 读取 PDF、Excel、Word、PPT 和常用文本附件；成功任务的新结果文件自动回传，也可手动取回。 |
 | **网页链接分析** | 提取公开网页的静态正文，支持总结、比较和来源标注。 |
+| **连续消息与队列** | 文件 + 后续说明、连续截图自动合并；每用户独立排队，支持立即提交和按编号取消。 |
+| **多项目切换** | 微信 `/项目` 选择本机登记的目录，各项目、各引擎分别保留会话。 |
 | **任务控制与审批** | 查看状态、取消任务、恢复上下文，并对需要确认的操作作单次审批。 |
 | **后台运行与升级** | 关闭终端后继续运行，使用 `wx-agent update` 检查并安装最新稳定版。 |
 
@@ -85,13 +87,13 @@ wx-agent user stop teammate    # 只停止指定用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.17.0/wx-codex-bridge-0.17.0.tgz --ignore-scripts
 ```
 
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.17.0/wx-codex-bridge-0.17.0.tgz --ignore-scripts
 ```
 
 安装包通过 GitHub Releases 提供，尚未发布到 npm。没有全局目录写入权限时，参见[用户目录安装](docs/setup.md#安装)。
@@ -132,7 +134,7 @@ wx-agent office-check  # 检查文档组件
 wx-agent media-check   # 检查视频组件和转写模型
 ```
 
-**能力边界：**扫描版 PDF 暂不做 OCR；登录或 JavaScript 动态网页可能无法完整读取；视频画面为抽样，转写可能有错漏。更多格式、限制和组件安装方法见[媒体与文件指南](docs/media.md)。
+**能力边界：**扫描版 PDF 支持本地 OCR（需可选组件，每份最多 20 个无文字页）；登录或 JavaScript 动态网页可能无法完整读取；视频画面为抽样，转写可能有错漏。更多格式、限制和组件安装方法见[媒体与文件指南](docs/media.md)。
 
 ## 常用命令，一眼找到
 
@@ -142,6 +144,8 @@ wx-agent media-check   # 检查视频组件和转写模型
 | --- | --- |
 | `/引擎`、`/引擎 claude`、`/引擎 codex` | 查看或切换引擎 |
 | `/模型`、`/模型 模型名` | 查看目录或切换模型 |
+| `/任务`、`/开始`、`/取消 编号` | 查看队列、立即提交、移除等待任务 |
+| `/项目`、`/项目 名称` | 列出并切换登记项目 |
 | `/状态`、`/取消` | 查看进度或中断当前任务 |
 | `/新会话`、`/结果` | 开启新上下文或获取最近结果 |
 | `/批准 编号`、`/拒绝 编号` | 处理本次操作审批 |
@@ -200,3 +204,17 @@ flowchart LR
 采用 [MIT 许可证](LICENSE)。欢迎提交 [Issue](https://github.com/zhouqise/wechat-agent-bridge/issues) 或 Pull Request，说明平台、版本、复现步骤和脱敏日志。
 
 <p align="center"><sub>WeChat Agent Bridge · Your coding agents. One conversation away.</sub></p>
+
+### 连续消息、项目与 OCR
+
+先发附件，再在 8 秒内发送说明，桥接会合并为一个任务；连续文字合并窗口为 1.5 秒，总等待不超过 20 秒。发送 `/开始` 可立即提交；同一用户忙碌时新任务进入队列，不同用户继续并行。
+
+电脑登记项目后，在微信用 `/项目 名称` 切换：
+
+```bash
+wx-agent stop
+wx-agent project add demo /absolute/path/to/project
+wx-agent start
+```
+
+截图与扫描 PDF 可启用本地 OCR：先安装 Tesseract，再运行 `wx-agent ocr-setup`（自动下载并校验中英文语言包），用 `wx-agent ocr-check` 验证。详见[OCR 安装与限制](docs/media.md#本地-ocr)。

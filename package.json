@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -43,7 +43,12 @@
     "file-send.mjs",
     "update.mjs",
     "web.mjs",
-    "users.mjs"
+    "users.mjs",
+    "task-queue.mjs",
+    "projects.mjs",
+    "auto-files.mjs",
+    "ocr.mjs",
+    "ocr_render.py"
   ],
   "os": [
     "darwin",

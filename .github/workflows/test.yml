@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install openpyxl==3.1.5 python-docx==1.2.0 python-pptx==1.0.2 pypdf==6.20.1
+      - run: python -m pip install openpyxl==3.1.5 python-docx==1.2.0 python-pptx==1.0.2 pypdf==6.20.1 pypdfium2==5.14.0 Pillow==12.3.0
       - run: npm test
       - name: Install real Codex CLI for launcher verification (no login)
         run: npm install -g @openai/codex@0.159.2 --ignore-scripts
@@ -40,7 +40,7 @@ jobs:
       - name: Verify installable package
         run: |
           npm pack
-          npm install -g ./wx-codex-bridge-0.16.0.tgz --ignore-scripts
+          npm install -g ./wx-codex-bridge-0.17.0.tgz --ignore-scripts
           wx-agent --version
           wx-agent --help
           if command -v wx-codex; then exit 1; fi

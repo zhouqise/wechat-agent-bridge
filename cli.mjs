@@ -11,6 +11,10 @@ import {modelListText,modelInfo,prepareModel} from './models.mjs';
 import {officeInputs,workspaceDir,FILE_EXTS} from './office.mjs';
 import {sendOfficeFile} from './file-send.mjs';
 import {webInputs} from './web.mjs';
+import {TaskQueue} from './task-queue.mjs';
+import {projectList,projectPath} from './projects.mjs';
+import {outputSnapshot,returnFiles} from './auto-files.mjs';
+import {ocrImages} from './ocr.mjs';
 import {mediaInputs} from './av.mjs';
 
 const p = paths();
@@ -20,6 +24,7 @@ const qrPath = p.qr;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let locked = false;
 let controller;
+let tasks;
 let server;
 let startedAt = Date.now();
 let lastPollAt = null;
@@ -40,6 +45,7 @@ async function save(state) {
 async function clean() {
   if (stopping) return;
   stopping = true;
+  tasks?.close();
   const preparing=controller?.active?.abort?controller.starting:null;
   controller?.close();
   await preparing;
@@ -121,13 +127,15 @@ async function main() {
   trustedBase(state.base);
   if (process.argv.includes('--login')) {console.log('微信已绑定。运行 wx-agent start 即可后台启动。');return;}
   const echo = process.argv.includes('--echo');
-  let contextToken,config,cwd,engine='codex';
+  let contextToken,config,cwd,engine='codex',taskToken,beforeFiles;
+  let currentProject='default';
   let selectEngine,selectModel,changing=false;
   if (!echo) {
     config = await readJSON(p.config, {});
     const requested = config.workspace || p.workspace;
     await fs.mkdir(requested,{recursive:true});
-    cwd = await fs.realpath(requested);
+    currentProject=config.currentProject || 'default';
+    cwd = await projectPath(config,p.workspace,currentProject);
     const send=async text => {
         if (!contextToken) throw new Error('需要先收到微信消息才能回复');
         const chars = [...text];
@@ -136,24 +144,27 @@ async function main() {
         const parts = [...clipped];
         for (let i = 0; i < parts.length; i += 1800) {
           const sent = await api(state.base,'ilink/bot/sendmessage',{msg:{from_user_id:'',to_user_id:state.owner,
-            client_id:randomUUID(),message_type:2,message_state:2,context_token:contextToken,
+            client_id:randomUUID(),message_type:2,message_state:2,context_token:taskToken || contextToken,
             item_list:[{type:1,text_item:{text:parts.slice(i,i+1800).join('')}}]}},state.token);
           if (sent.ret !== 0) throw new Error('发送未确认');
         }
         console.log('已向绑定用户发送一条引擎状态或结果。');
       };
-    selectEngine=async (name,persist=false)=>{
+    selectEngine=async (name,persist=false,targetCwd=cwd,project=null)=>{
       const next=engineName(name);
-      const candidate=makeController({engine:next,cwd,config,state,save:async()=>save(state),send});
+      const candidate=makeController({engine:next,cwd:targetCwd,config,state,save:async()=>save(state),send,onFinish:async status=>{
+        if(status==='completed' && !stopping)await returnFiles({cwd,before:beforeFiles,say:text=>controller.say(text),send:name=>sendOfficeFile({cwd,name,state,contextToken:taskToken})});
+      }});
       try {
         await candidate.initialize();
-        if(persist)await writeJSON(p.config,{...config,engine:next});
+        await save(state);
+        if(persist || project!==null)await writeJSON(p.config,{...config,engine:next,...(project!==null?{currentProject:project}:{})});
       }catch(e){candidate.close();throw e;}
-      controller?.close();controller=candidate;engine=next;config.engine=next;
-      await save(state);
+      controller?.close();controller=candidate;engine=next;config.engine=next;cwd=targetCwd;
+      if(project!==null){currentProject=project;config.currentProject=project;}
     };
     selectModel=async value=>{
-      if(changing || controller.active)throw new Error('任务执行中或配置正在变更，请稍后再切换模型');
+      if(changing || controller.active || tasks?.busy)throw new Error('任务执行中或配置正在变更，请稍后再切换模型');
       changing=true;
       try {
         const change=prepareModel(config,engine,value);
@@ -163,8 +174,27 @@ async function main() {
       }finally{changing=false;}
     };
     await selectEngine(config.engine || 'codex');
+    tasks=new TaskQueue({state:state.tasks ||= {},save:()=>save(state),say:text=>controller.say(text),run:async task=>{
+      if(!controller.ready)throw Error('引擎未连接');
+      taskToken=task.contextToken;beforeFiles=null;
+      try{
+        try{beforeFiles=await outputSnapshot(cwd);}catch(e){await controller.say(e.message+'；本次可用 /文件 手动取回。');}
+        let settle;const done=new Promise(r=>{settle=r;});controller.onSettled=settle;
+        await controller.handle(task.text,task.key,async(signal,onProgress)=>{
+          const media=await mediaInputs(task.items,{signal,onProgress});
+          // OCR screenshots only, not sampled video frames.
+          const imageCount=task.items.filter(i=>i.type===2).length;
+          const ocr=await ocrImages(media.filter(i=>i.type==='image').slice(0,imageCount),{signal,onProgress});
+          const files=[];
+          for(const item of task.items.filter(i=>i.type===4))files.push(...await officeInputs([item],cwd,{signal}));
+          return [...media,...ocr,...files,...await webInputs(task.text,{signal,onProgress})];
+        });
+        await controller.starting;
+        if(controller.active)await done;
+      }finally{controller.onSettled=null;taskToken=null;beforeFiles=null;}
+    }});
   }
-  server = await serve(p, () => ({pid:process.pid,startedAt,...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):'空闲'}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc));
+  server = await serve(p, () => ({pid:process.pid,startedAt,...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,project:currentProject,queued:tasks?.pending.length || 0,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):(tasks?.busy?'排队中':'空闲')}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc));
   console.log('桥接已启动。微信发送 /帮助 或直接发送任务；wx-agent status 查看状态。');
   let failures = 0;
   while (true) {
@@ -180,6 +210,16 @@ async function main() {
         lastReceivedAt = Date.now();
         contextToken = msg.context_token;
         if(changing){await controller.say('配置正在变更，请稍后重试。');return;}
+        if(await tasks.command(text))return;
+        if(text==='/项目') {await controller.say(`当前项目：${currentProject}\n`+Object.entries(projectList(config,p.workspace)).map(([n,dir])=>`/项目 ${n} — ${dir}`).join('\n'));return;}
+        if(text.startsWith('/项目 ')) {
+          if(tasks.busy || controller.active){await controller.say('请等待当前任务完成，并用 /清空队列 清除等待任务后再切换项目。');return;}
+          const name=text.slice(4).trim();
+          try{changing=true;const targetCwd=await projectPath(config,p.workspace,name);await selectEngine(engine,false,targetCwd,name);await controller.say(`已切换项目 ${name}，恢复该项目的 ${engine} 会话。`);}
+          catch(e){await controller.say('项目切换失败：'+e.message);}
+          finally{changing=false;}return;
+        }
+        if(text==='/新会话' && tasks.busy){await controller.say('请先等待任务完成或取消，并 /清空队列 后再新建会话。');return;}
         if(text==='/模型') {await controller.say(await modelListText(config,engine,controller.rpc));return;}
         if(text.startsWith('/模型 ')) {
           try {const info=await selectModel(text.slice(4).trim());await controller.say(`模型已设置为 ${info.model}，下一条任务生效；可用性由账号或服务商决定。`);}
@@ -188,7 +228,7 @@ async function main() {
         }
         if(text==='/引擎') {await controller.say(`当前引擎：${engine}。发送 /引擎 codex 或 /引擎 claude 切换，两个引擎分别保留会话。`);return;}
         if(text.startsWith('/引擎 ')) {
-          if(controller.active){await controller.say('任务执行中，请等待完成或 /取消 后再切换引擎。');return;}
+          if(controller.active || tasks.busy){await controller.say('任务执行中，请等待完成或 /取消 后再切换引擎。');return;}
           const next=text.slice(4).trim().toLowerCase();
           if(!['codex','claude'].includes(next)){await controller.say('请使用 /引擎 codex 或 /引擎 claude');return;}
           if(next===engine){await controller.say(`当前已经是 ${engine}。`);return;}
@@ -198,7 +238,7 @@ async function main() {
           return;
         }
         if(text==='/文件' || text.startsWith('/文件 ')) {
-          if(controller.active){await controller.say('任务执行中，请完成后再取回文件。');return;}
+          if(controller.active || tasks.busy){await controller.say('任务执行中，请完成后再取回文件。');return;}
           if(text==='/文件') {
             const dir=await workspaceDir(cwd,'wx-agent-output');
             const names=(await fs.readdir(dir)).filter(n=>FILE_EXTS.includes(path.extname(n).toLowerCase())).slice(0,50);
@@ -213,7 +253,8 @@ async function main() {
           await controller.say('这条消息包含暂不支持的附件，请使用文字、截图、微信语音、MP4 视频或 PDF、Office、文本文件。');
           return;
         }
-        await controller.handle(text,key,(items.some(i=>[2,3,4,5].includes(i.type))||/https?:\/\//i.test(text))?async (signal,onProgress)=>[...await mediaInputs(items,{signal,onProgress}),...await officeInputs(items,cwd,{signal}),...await webInputs(text,{signal,onProgress})]:undefined);
+        if(text.startsWith('/'))await controller.handle(text,key);
+        else await tasks.enqueue(text,items,key,msg.context_token);
       });
       failures = 0;
       await sleep(1000);
