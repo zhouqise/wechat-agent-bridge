@@ -13,6 +13,7 @@ import {codexSettings} from './codex-config.mjs';
 import {CodexRPC} from './rpc.mjs';
 import {codexCommand,claudeCommand} from './platform.mjs';
 import {ClaudeRPC} from './claude.mjs';
+import {updatePackage} from './update.mjs';
 import {engineName} from './engines.mjs';
 
 const run=promisify(execFile), p=paths();
@@ -25,6 +26,7 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
   start          后台启动，关闭终端仍运行
   stop           停止桥接及其引擎子进程
   restart        停止后重新启动
+  update         升级到 GitHub 最新稳定版（--check 只检查）
   status         查看进程、微信、引擎和任务状态
   logs           查看最近日志（logs --follow 持续查看）
   doctor         检查当前引擎（--engine claude 或 codex）
@@ -172,6 +174,17 @@ async function stop() {
   for(let i=0;i<60;i++){await sleep(200);if(!await running() && !await busy()){console.log('已停止。');return;}}
   throw new Error('停止尚未确认，请稍后执行 wx-agent status');
 }
+async function update() {
+  if(process.argv.slice(3).some(a=>a!=='--check'))throw Error('用法：wx-agent update [--check]');
+  await privateDir(p.dir);
+  const guard={...p,lock:path.join(p.dir,'update.lock')};await acquireLock(guard);
+  try {await updatePackage({root,current:JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version,check:process.argv.includes('--check'),
+    state:async()=>{const state=await running();if(!state&&await busy())throw Error('服务正在启动或配置，请稍后重试');return state;},
+    stop:async()=>{const result=await control(p,'stop-if-idle');if(result.error)throw Error('服务未安全停止：请等待任务结束后手动 stop，再重试 update');for(let i=0;i<60;i++){await sleep(200);if(!await busy())return;}throw Error('停止未确认，请稍后重试');},
+    lock:()=>acquireLock(p),unlock:()=>releaseLock(p),
+    restart:async()=>{await run(process.execPath,[path.join(root,'wx-agent.mjs'),'start'],{timeout:30000,windowsHide:true});}
+  });}finally{await releaseLock(guard);}
+}
 async function status() {
   const state=await running();
   if(!state){const phase=await busy()?'starting':'stopped';console.log(process.argv.includes('--json')?JSON.stringify({service:'wx-codex',status:phase}):phase==='starting'?'状态：启动或配置中，管理接口尚不可用':'状态：已停止');return;}
@@ -260,10 +273,10 @@ async function migrate() {
 try {
   if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
-  const commands={setup,start,stop,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
+  const commands={setup,start,stop,update,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.12.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.13.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

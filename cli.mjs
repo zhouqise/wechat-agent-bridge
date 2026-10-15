@@ -172,6 +172,7 @@ async function main() {
         if (sent.ret !== 0) throw new Error('发送响应未确认成功');
         console.log('已向绑定用户回复一条测试消息。');
       }, echo ? undefined : async (text,msg,key) => {
+        if(stopping)return;
         lastReceivedAt = Date.now();
         contextToken = msg.context_token;
         if(changing){await controller.say('配置正在变更，请稍后重试。');return;}

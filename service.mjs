@@ -37,6 +37,7 @@ export async function serve(p,status,stop,setModel,listModels) {
         }
       }catch{socket.destroy();return;}
       if(command==='status')socket.end(JSON.stringify({service:'wx-codex',...status()})+'\n');
+      else if(command==='stop-if-idle') {if(status().task!=='空闲')socket.end('{"error":"busy"}\n');else {socket.end(JSON.stringify({service:'wx-codex',stopping:true})+'\n');stop();}}
       else if(command==='stop') {socket.end(JSON.stringify({service:'wx-codex',stopping:true})+'\n');setTimeout(stop,100);}
       else if(command==='models' && listModels) {
         socket.setTimeout(12000);
