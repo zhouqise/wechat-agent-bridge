@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {paths} from './paths.mjs';
 import {imageInputs,downloadMedia,MediaError} from './media.mjs';
 const exec=promisify(execFile);
 const LIMIT=120;
@@ -46,7 +47,24 @@ export async function mediaInputs(items,{signal,fetcher=fetch,run=exec,env=proce
         result.push({type:'text',text:`画面时间 ${time.toFixed(1)} 秒`},{type:'image',url:'data:image/jpeg;base64,'+frame.toString('base64')});
       }
     }
-    result.push({type:'text',text:'本次仅分析视频抽样画面，未识别音轨。不要推断语音或背景音内容；如需分析，请用户补充文字。'});
+    if(!probe.streams?.some(s=>s.codec_type==='audio')) {
+      result.push({type:'text',text:'视频没有音轨，本次只分析抽样画面，不推断语音或背景音内容。'});
+    } else {
+      const model=env.WHISPER_MODEL || path.join(paths(env).dir,'models','ggml-base.bin');
+      try {
+        if(!await fs.stat(model).then(s=>s.isFile(),()=>false))throw new MediaError('未配置视频音轨识别模型');
+        const audio=path.join(dir,'audio.wav'),output=path.join(dir,'transcript');
+        await command(ffmpeg,['-nostdin','-v','error','-protocol_whitelist','file,pipe','-f',format,'-i',input,'-map','0:a:0','-vn','-t',String(LIMIT),'-ac','1','-ar','16000','-c:a','pcm_s16le','-threads','1','-y',audio],signal,run);
+        await command(env.WHISPER_BINARY || 'whisper-cli',['-m',model,'-f',audio,'-l','auto','-osrt','-of',output,'-t','4'],signal,run);
+        if((await fs.stat(output+'.srt')).size>64000)throw new MediaError('音轨转写过长');
+        const transcript=(await fs.readFile(output+'.srt','utf8')).trim();
+        if(!transcript || transcript.length>16000)throw new MediaError('未识别出有效音轨文字');
+        result.push({type:'text',text:'以下是视频首条音轨的离线转写（SRT 时间范围，可能有错漏或误识别；不代表说话人身份或非语音音效）。请结合对应时间的画面与转写共同分析，区分看到的内容和听写内容，遇到矛盾或不确定处明确说明，不补造缺失内容。\n'+transcript});
+      }catch {
+        if(signal?.aborted)throw new MediaError('已取消媒体处理');
+        result.push({type:'text',text:'视频有音轨，但音轨转写未完成（可能缺少组件/模型、超时或没有可识别文字）。必须向用户明确说明本次仅分析画面，不得推断语音内容；可在电脑运行 wx-agent media-check 检查。'});
+      }
+    }
     return result;
   }catch(e){if(e instanceof MediaError)throw e;throw new MediaError(signal?.aborted?'已取消媒体处理':'媒体解码失败，请使用微信语音或 MP4 视频重试。');}
   finally{await fs.rm(dir,{recursive:true,force:true});}

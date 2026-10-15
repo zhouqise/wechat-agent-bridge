@@ -31,7 +31,7 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
   engine [名称]  查看或切换默认引擎，保留独立会话
   office-setup   安装独立 Office 处理环境（需要 Python 3）
   office-check   检查 Excel/Word/PPT 处理环境
-  media-check    检查视频抽帧组件
+  media-check    检查视频抽帧、音轨识别组件与模型
   model [模型名] 查看或切换当前引擎模型
   login          交互式微信扫码（login --force 重新绑定）
   run            前台运行，Ctrl+C 停止
@@ -216,11 +216,13 @@ async function model() {
   }finally{await releaseLock(p);}
 }
 async function mediaCheck() {
-  for(const [label,binary] of [['FFmpeg',process.env.FFMPEG_BINARY || 'ffmpeg'],['FFprobe',process.env.FFPROBE_BINARY || 'ffprobe']]) {
+  for(const [label,binary] of [['FFmpeg',process.env.FFMPEG_BINARY || 'ffmpeg'],['FFprobe',process.env.FFPROBE_BINARY || 'ffprobe'],['Whisper',process.env.WHISPER_BINARY || 'whisper-cli']]) {
     try {await run(binary,[label==='Whisper'?'-h':'-version'],{timeout:10000,windowsHide:true});console.log(label+'：已安装');}
     catch{throw new Error(label+' 不可用，请按 README 安装或配置可执行文件路径');}
   }
-  console.log('视频抽帧组件已就绪；语音只使用微信附带的转文字，不做本机识别。');
+  const model=process.env.WHISPER_MODEL || path.join(p.dir,'models','ggml-base.bin');
+  if(!await fs.stat(model).then(s=>s.isFile(),()=>false))throw new Error('视频音轨识别模型未配置，请按 README 下载或设置 WHISPER_MODEL');
+  console.log('视频抽帧与音轨识别组件已就绪；微信语音仍只使用微信附带转文字。');
 }
 async function logs() {
   let position=0;
@@ -261,7 +263,7 @@ try {
   const commands={setup,start,stop,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.10.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.11.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}
