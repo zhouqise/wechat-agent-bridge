@@ -40,4 +40,6 @@ test('Windows Claude 兼容原生 exe 与 npm 启动器',async()=>{
   const entry=dir+'\\node_modules\\@anthropic-ai\\claude-code\\cli.js';
   assert.deepEqual(claudeCommand(['--version'],{platform:'win32',env:{Path:dir},node:'node.exe',exists:p=>[dir+'\\claude.cmd',entry].includes(p)}),{file:'node.exe',args:[entry,'--version']});
   assert.equal(claudeCommand([],{platform:'win32',env:{PATH:'C:\\bin'},exists:p=>p==='C:\\bin\\claude.exe'}).file,'C:\\bin\\claude.exe');
+  const native=dir+'\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe';
+  assert.deepEqual(claudeCommand(['--version'],{platform:'win32',env:{PATH:dir},exists:p=>p===native}),{file:native,args:['--version']});
 });

@@ -31,6 +31,8 @@ export function claudeCommand(args,{platform=process.platform,env=process.env,ex
   for(const raw of (env[key] || '').split(';')) {
     const dir=raw.replace(/^"|"$/g,'');if(!dir)continue;
     const exe=path.win32.join(dir,'claude.exe');if(exists(exe))return {file:exe,args};
+    const native=path.win32.join(dir,'node_modules','@anthropic-ai','claude-code','bin','claude.exe');
+    if(exists(native))return {file:native,args};
     const entry=path.win32.join(dir,'node_modules','@anthropic-ai','claude-code','cli.js');
     if(exists(path.win32.join(dir,'claude.cmd')) && exists(entry))return {file:node,args:[entry,...args]};
   }

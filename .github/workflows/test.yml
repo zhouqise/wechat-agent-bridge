@@ -31,7 +31,7 @@ jobs:
         run: node --input-type=module -e "import {codexCommand} from './platform.mjs'; import {execFileSync} from 'node:child_process'; const c=codexCommand(['--version']); console.log(execFileSync(c.file,c.args,{encoding:'utf8',timeout:20000,windowsHide:true}));"
       - name: Install and verify Claude Code launcher (no login)
         run: |
-          npm install -g @anthropic-ai/claude-code@2.1.121 --ignore-scripts
+          npm install -g @anthropic-ai/claude-code@2.1.121
           node --input-type=module -e "import {claudeCommand} from './platform.mjs'; import {execFileSync} from 'node:child_process'; const c=claudeCommand(['--version']); console.log(execFileSync(c.file,c.args,{encoding:'utf8',timeout:20000,windowsHide:true}));"
       - name: Verify installable package
         run: |
