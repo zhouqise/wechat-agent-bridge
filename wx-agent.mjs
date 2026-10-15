@@ -13,7 +13,7 @@ import {codexSettings} from './codex-config.mjs';
 import {CodexRPC} from './rpc.mjs';
 import {codexCommand,claudeCommand} from './platform.mjs';
 import {ClaudeRPC} from './claude.mjs';
-import {updatePackage} from './update.mjs';
+import {updatePackage,updateFetcher} from './update.mjs';
 import {engineName} from './engines.mjs';
 
 const run=promisify(execFile), p=paths();
@@ -177,8 +177,10 @@ async function stop() {
 async function update() {
   if(process.argv.slice(3).some(a=>a!=='--check'))throw Error('用法：wx-agent update [--check]');
   await privateDir(p.dir);
+  const config=await readJSON(p.config,{});
+  const proxy=process.env.WX_AGENT_UPDATE_PROXY || process.env.HTTPS_PROXY || (config.engine==='claude'?config.claudeProxy:config.codexProxy);
   const guard={...p,lock:path.join(p.dir,'update.lock')};await acquireLock(guard);
-  try {await updatePackage({root,current:JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version,check:process.argv.includes('--check'),
+  try {await updatePackage({root,fetcher:updateFetcher(proxy),current:JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version,check:process.argv.includes('--check'),
     state:async()=>{const state=await running();if(!state&&await busy())throw Error('服务正在启动或配置，请稍后重试');return state;},
     stop:async()=>{const result=await control(p,'stop-if-idle');if(result.error)throw Error('服务未安全停止：请等待任务结束后手动 stop，再重试 update');for(let i=0;i<60;i++){await sleep(200);if(!await busy())return;}throw Error('停止未确认，请稍后重试');},
     lock:()=>acquireLock(p),unlock:()=>releaseLock(p),
@@ -276,7 +278,7 @@ try {
   const commands={setup,start,stop,update,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.13.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.13.1'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

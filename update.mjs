@@ -6,6 +6,16 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const exec=promisify(execFile);
 const repo='https://github.com/zhouqise/wechat-agent-bridge';
+export function updateFetcher(proxy,{run=exec,platform=process.platform}={}) {
+  if(!proxy || proxy==='direct')return fetch;
+  const url=new URL(proxy);if(!['http:','https:','socks5:','socks5h:'].includes(url.protocol)||url.username||url.password)throw Error('升级代理必须是不含账号密码的 HTTP/SOCKS 地址');
+  return async (url,options)=>{
+    try {
+      const {stdout}=await run(platform==='win32'?'curl.exe':'curl',['--fail','--location','--silent','--show-error','--connect-timeout','15','--max-time','120','--max-filesize',String(20*1024*1024),'--proto','=https','--proto-redir','=https','--proxy',proxy,'-H','User-Agent: wx-agent-updater','-H','Accept: '+options.headers.Accept,url],{encoding:'buffer',timeout:125000,maxBuffer:20*1024*1024,windowsHide:true,shell:false,signal:options.signal});
+      return new Response(stdout);
+    }catch{throw Error('通过代理下载更新失败，请检查代理与系统 curl；现有配置保留');}
+  };
+}
 export function newer(a,b) {
   if(!/^\d+\.\d+\.\d+$/.test(a)||!/^\d+\.\d+\.\d+$/.test(b))throw Error('版本号格式不受支持');
   const x=a.split('.').map(Number),y=b.split('.').map(Number);

@@ -1,5 +1,9 @@
 # 更新记录
 
+## 0.13.1
+
+- 升级下载支持已有代理与 WX_AGENT_UPDATE_PROXY，修复可检查版本但无法直连下载包的问题。
+
 ## 0.13.0
 
 - 新增 wx-agent update 与 update --check，校验 GitHub 稳定发布并保留全局安装位置。

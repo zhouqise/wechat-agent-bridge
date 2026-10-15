@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import {createHash} from 'node:crypto';
-import {updatePackage,newer,installPrefix,npmCommand} from '../update.mjs';
+import {updatePackage,newer,installPrefix,npmCommand,updateFetcher} from '../update.mjs';
 test('版本比较、全局安装前缀和 Windows npm 不经过 shell',async()=>{
  assert.equal(newer('0.13.0','0.12.9'),true);assert.equal(newer('0.9.0','0.13.0'),false);assert.throws(()=>newer('1.0.0;bad','1.0.0'));
  assert.equal(installPrefix('/home/a/lib/node_modules/wx-codex-bridge','linux'),'/home/a');
@@ -47,4 +47,13 @@ test('管理接口只在空闲时停止，执行中不停止',async t=>{
  t.after(async()=>{await server.close();await fs.rm(dir,{recursive:true,force:true});});
  assert.equal((await control(p,'stop-if-idle')).error,'busy');assert.equal(stops,0);
  task='空闲';assert.equal((await control(p,'stop-if-idle')).stopping,true);assert.equal(stops,1);
+});
+
+test('代理下载使用参数调用 curl，错误不暴露代理信息',async()=>{
+ const proxy='http://127.0.0.1:7892';let captured;
+ const fetcher=updateFetcher(proxy,{platform:'win32',run:async(file,args,opts)=>{captured={file,args,opts};return {stdout:Buffer.from('fixture')};}});
+ assert.equal(await (await fetcher('https://github.com/test',{headers:{Accept:'application/octet-stream'}})).text(),'fixture');
+ assert.equal(captured.file,'curl.exe');assert.equal(captured.opts.shell,false);assert.ok(captured.args.includes(proxy));
+ assert.throws(()=>updateFetcher('http://user:password@example.com'),/账号密码/);
+ await assert.rejects(updateFetcher(proxy,{run:async()=>{throw Error('private');}})('https://github.com/test',{headers:{}}),e=>!e.message.includes('private'));
 });
