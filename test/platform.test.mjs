@@ -34,3 +34,10 @@ test('Windows 停止当前持有的子进程树，已退出的句柄不再终止
   stopChild({...child,exitCode:0},{platform:'win32',exec:()=>{throw Error('unexpected');}});
   assert.equal(killed,false);
 });
+test('Windows Claude 兼容原生 exe 与 npm 启动器',async()=>{
+  const {claudeCommand}=await import('../platform.mjs');
+  const dir='C:\\Users\\demo\\AppData\\Roaming\\npm';
+  const entry=dir+'\\node_modules\\@anthropic-ai\\claude-code\\cli.js';
+  assert.deepEqual(claudeCommand(['--version'],{platform:'win32',env:{Path:dir},node:'node.exe',exists:p=>[dir+'\\claude.cmd',entry].includes(p)}),{file:'node.exe',args:[entry,'--version']});
+  assert.equal(claudeCommand([],{platform:'win32',env:{PATH:'C:\\bin'},exists:p=>p==='C:\\bin\\claude.exe'}).file,'C:\\bin\\claude.exe');
+});

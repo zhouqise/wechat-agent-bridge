@@ -1,13 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {paths, privateDir, acquireLock, releaseLock, readJSON} from './paths.mjs';
+import {paths, privateDir, acquireLock, releaseLock, readJSON, writeJSON} from './paths.mjs';
 import {serve} from './service.mjs';
 import {createInterface} from 'node:readline/promises';
 import QRCode from 'qrcode';
 import {randomUUID} from 'node:crypto';
 import {BASE, api, trustedBase, acceptBatch} from './bridge.mjs';
-import {CodexRPC} from './rpc.mjs';
-import {Controller} from './controller.mjs';
+import {engineName,makeController} from './engines.mjs';
 import {imageInputs} from './media.mjs';
 
 const p = paths();
@@ -113,18 +112,14 @@ async function main() {
   trustedBase(state.base);
   if (process.argv.includes('--login')) {console.log('微信已绑定。运行 wx-codex start 即可后台启动。');return;}
   const echo = process.argv.includes('--echo');
-  let contextToken;
+  let contextToken,config,cwd,engine='codex';
+  let selectEngine;
   if (!echo) {
-    const config = await readJSON(p.config, {});
+    config = await readJSON(p.config, {});
     const requested = config.workspace || p.workspace;
     await fs.mkdir(requested,{recursive:true});
-    const cwd = await fs.realpath(requested);
-    state.codex ??= {};
-    if (state.codex.workspace && state.codex.workspace !== cwd) state.codex = {};
-    state.codex.workspace = cwd;
-    controller = new Controller({rpc:new CodexRPC({cwd, proxy:process.env.BRIDGE_CODEX_PROXY || config.codexProxy}), cwd, state:state.codex,
-      save:async () => save(state),
-      send:async text => {
+    cwd = await fs.realpath(requested);
+    const send=async text => {
         if (!contextToken) throw new Error('需要先收到微信消息才能回复');
         const chars = [...text];
         const limit = 16000;
@@ -136,11 +131,21 @@ async function main() {
             item_list:[{type:1,text_item:{text:parts.slice(i,i+1800).join('')}}]}},state.token);
           if (sent.ret !== 0) throw new Error('发送未确认');
         }
-        console.log('已向绑定用户发送一条 Codex 状态或结果。');
-      }});
-    await controller.initialize();
+        console.log('已向绑定用户发送一条引擎状态或结果。');
+      };
+    selectEngine=async (name,persist=false)=>{
+      const next=engineName(name);
+      const candidate=makeController({engine:next,cwd,config,state,save:async()=>save(state),send});
+      try {
+        await candidate.initialize();
+        if(persist)await writeJSON(p.config,{...config,engine:next});
+      }catch(e){candidate.close();throw e;}
+      controller?.close();controller=candidate;engine=next;config.engine=next;
+      await save(state);
+    };
+    await selectEngine(config.engine || 'codex');
   }
-  server = await serve(p, () => ({pid:process.pid,startedAt,mode:echo?'echo':'codex',wechatBound:true,lastPollAt,lastReceivedAt,codexConnected:!!controller?.ready,workspace:state.codex?.workspace,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):'空闲'}), () => {void clean().finally(()=>process.exit(0));});
+  server = await serve(p, () => ({pid:process.pid,startedAt,mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):'空闲'}), () => {void clean().finally(()=>process.exit(0));});
   console.log('桥接已启动。微信发送 /帮助 或直接发送任务；wx-codex status 查看状态。');
   let failures = 0;
   while (true) {
@@ -154,6 +159,16 @@ async function main() {
       }, echo ? undefined : async (text,msg,key) => {
         lastReceivedAt = Date.now();
         contextToken = msg.context_token;
+        if(text==='/引擎') {await controller.say(`当前引擎：${engine}。发送 /引擎 codex 或 /引擎 claude 切换，两个引擎分别保留会话。`);return;}
+        if(text.startsWith('/引擎 ')) {
+          if(controller.active){await controller.say('任务执行中，请等待完成或 /取消 后再切换引擎。');return;}
+          const next=text.slice(4).trim().toLowerCase();
+          if(!['codex','claude'].includes(next)){await controller.say('请使用 /引擎 codex 或 /引擎 claude');return;}
+          if(next===engine){await controller.say(`当前已经是 ${engine}。`);return;}
+          try {await selectEngine(next,true);await controller.say(`已切换到 ${engine}，该引擎的会话独立保留。`);}
+          catch {await controller.say('引擎切换失败，仍保留原引擎。请在电脑上用 wx-codex doctor --engine '+next+' 检查安装及认证配置。');}
+          return;
+        }
         const items=msg.item_list ?? [];
         if(items.some(i=>i.type!==1 && i.type!==2)) {
           await controller.say('这条消息包含暂不支持的内容，请使用文字或直接发送截图（PNG/JPEG/WebP）；语音、视频和文件暂不处理。');

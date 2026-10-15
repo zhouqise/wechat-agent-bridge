@@ -103,3 +103,11 @@ test('图片失败给予反馈并释放任务，不关闭 Codex 或提交不完�
   await c.handle('','good',async()=>[{type:'image',url:'data:image/png;base64,test'}]);await c.starting;
   assert.match(rpc.calls.find(x=>x.method==='turn/start').params.input[0].text,/请分析/);
 });
+test('Claude 标签只影响系统提示，不改写模型结果中的 Codex 文字',async()=>{
+  const {controller:c,messages}=await setup({label:'Claude Code'});
+  await c.handle('test','label');await c.starting;
+  assert.ok(messages.some(x=>x.startsWith('Claude Code 已接收')));
+  await c.event({method:'item/completed',params:{threadId:'thread1',turnId:'turn1',item:{id:'final',type:'agentMessage',phase:'final_answer',text:'Codex 与 Claude 不同'}}});
+  await c.event({method:'turn/completed',params:{threadId:'thread1',turn:{id:'turn1',status:'completed'}}});
+  assert.equal(messages.at(-1),'任务完成\nCodex 与 Claude 不同');
+});

@@ -8,13 +8,15 @@ import {createInterface} from 'node:readline/promises';
 import {paths,privateDir,readJSON,writeJSON,alive,acquireLock,releaseLock} from './paths.mjs';
 import {control} from './service.mjs';
 import {CodexRPC} from './rpc.mjs';
-import {codexCommand} from './platform.mjs';
+import {codexCommand,claudeCommand} from './platform.mjs';
+import {ClaudeRPC} from './claude.mjs';
+import {engineName} from './engines.mjs';
 
 const run=promisify(execFile), p=paths();
 const root=path.dirname(fileURLToPath(import.meta.url));
 const worker=path.join(root,'cli.mjs');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const help=`wx-codex — 在个人微信使用本机 Codex
+const help=`wx-codex — 在个人微信使用本机 Codex / Claude Code
 
   setup          首次配置：环境检查、工作目录、代理、微信扫码
   start          后台启动，关闭终端仍运行
@@ -22,7 +24,8 @@ const help=`wx-codex — 在个人微信使用本机 Codex
   restart        停止后重新启动
   status         查看进程、微信、Codex 和任务状态
   logs           查看最近日志（logs --follow 持续查看）
-  doctor         检查 Codex 登录及服务网络
+  doctor         检查当前引擎（--engine claude 或 codex）
+  engine [名称]  查看或切换默认引擎，保留独立会话
   login          交互式微信扫码（login --force 重新绑定）
   run            前台运行，Ctrl+C 停止
   migrate        导入本目录旧版绑定和配置，保留旧文件备份
@@ -41,14 +44,29 @@ async function foreground(args=[]) {
   const child=spawn(process.execPath,[worker,...args],{stdio:'inherit',env:process.env});
   return new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(new Error('前台进程退出，请检查以上提示')));});
 }
-async function prerequisites() {
+async function prerequisites(engine='codex') {
   if(Number(process.versions.node.split('.')[0])<22)throw new Error('需要 Node.js 22 或以上版本');
-  try {const command=codexCommand(['--version']);const {stdout}=await run(command.file,command.args,{timeout:10000,windowsHide:true});console.log(stdout.trim());}
-  catch {throw new Error('未找到可用 Codex CLI。请先安装 Codex CLI，并执行 codex login。');}
+  try {const command=(engine==='claude'?claudeCommand:codexCommand)(['--version']);const {stdout}=await run(command.file,command.args,{timeout:10000,windowsHide:true});console.log(stdout.trim());}
+  catch {throw new Error(engine==='claude'?'未找到 Claude Code，请先安装并在电脑上登录。':'未找到可用 Codex CLI。请先安装 Codex CLI，并执行 codex login。');}
 }
 async function doctor(config=undefined) {
-  await prerequisites();config ??= await readJSON(p.config,{});
+  config ??= await readJSON(p.config,{});
+  const flag=process.argv.indexOf('--engine');
+  const engine=engineName(flag>=0?process.argv[flag+1]:config.engine || 'codex');
+  await prerequisites(engine);
   const cwd=config.workspace || p.workspace;await fs.mkdir(cwd,{recursive:true});
+  if(engine==='claude') {
+    const auth=config.claudeAuth || 'local';
+    const rpc=new ClaudeRPC({cwd,auth,proxy:process.env.BRIDGE_CLAUDE_PROXY || config.claudeProxy});
+    await rpc.initialize();rpc.close();
+    if(auth==='local') {
+      const c=claudeCommand(['--setting-sources','user','auth','status']);
+      const result=JSON.parse((await run(c.file,c.args,{cwd,timeout:10000,windowsHide:true})).stdout);
+      if(!result.loggedIn)throw new Error('Claude Code 尚未登录，请在电脑上执行 claude auth login');
+      console.log('Claude Code：本机认证已配置（不代表远端请求已验证）');
+    } else console.log('Claude：ANTHROPIC_API_KEY 已配置（未验证密钥有效性或额度）');
+    return;
+  }
   const rpc=new CodexRPC({cwd,proxy:process.env.BRIDGE_CODEX_PROXY || config.codexProxy});
   try {
     await rpc.initialize();const auth=await rpc.request('account/read',{refreshToken:false});
@@ -68,30 +86,39 @@ async function doctor(config=undefined) {
 async function setup() {
   if(await busy())throw new Error('请先 wx-codex stop，再修改配置');
   if(!process.stdin.isTTY)throw new Error('setup 需要交互式终端，请在电脑终端运行 wx-codex setup');
-  await prerequisites();await privateDir(p.dir);
+  await privateDir(p.dir);
   const old=await readJSON(p.config,{});
   const rl=createInterface({input:process.stdin,output:process.stdout});
   let config;
   try {
+    const engine=engineName((await rl.question(`引擎 codex / claude（回车使用 ${old.engine || 'codex'}）：`)).trim().toLowerCase() || old.engine || 'codex');
+    await prerequisites(engine);
+    let claudeAuth=old.claudeAuth || 'local';
+    if(engine==='claude') {
+      claudeAuth=(await rl.question(`Claude 认证 local（本机登录）/ api（环境变量 API Key），回车使用 ${claudeAuth}：`)).trim() || claudeAuth;
+      if(!['local','api'].includes(claudeAuth))throw new Error('认证方式请输入 local 或 api');
+      if(claudeAuth==='api')console.log('API Key 仅从 ANTHROPIC_API_KEY 环境变量读取，不要在这里输入密钥。');
+    }
+    const proxyField=engine==='codex'?'codexProxy':'claudeProxy';
     const workspace=(await rl.question(`工作目录（回车使用 ${old.workspace || p.workspace}）：`)).trim() || old.workspace || p.workspace;
-    const proxyText=(await rl.question(`Codex 代理（回车保留 ${old.codexProxy || '直连'}，输入 direct 改为直连）：`)).trim();
-    const proxy=proxyText==='direct'?'':proxyText || old.codexProxy || '';
+    const proxyText=(await rl.question(`当前引擎代理（回车保留 ${old[proxyField] || '直连'}，输入 direct 改为直连）：`)).trim();
+    const proxy=proxyText==='direct'?'':proxyText || old[proxyField] || '';
     if(proxy) {const u=new URL(proxy);if(!['http:','https:','socks5:','socks5h:'].includes(u.protocol)||u.username||u.password)throw new Error('请输入不含账号密码的 HTTP/SOCKS 代理地址');}
     const expanded=workspace.startsWith('~/')?path.join((await import('node:os')).homedir(),workspace.slice(2)):workspace;
     const full=path.resolve(expanded);await fs.mkdir(full,{recursive:true});
-    config={workspace:await fs.realpath(full),codexProxy:proxy};
+    config={...old,engine,claudeAuth,workspace:await fs.realpath(full),[proxyField]:proxy};
   }finally{rl.close();}
   // 修改配置与启动共用锁，阻止配置向导和后台实例同时改变目录。
   await acquireLock(p);
   try {
     const session=await readJSON(p.session,null);
-    if(session?.codex?.threadId && old.workspace!==config.workspace) {
-      session.codex={workspace:config.workspace};await writeJSON(p.session,session);
+    if(session && old.workspace!==config.workspace) {
+      session.codex={workspace:config.workspace};session.claude={workspace:config.workspace};await writeJSON(p.session,session);
       console.log('工作目录变化，已为新目录清空会话引用，原工作文件未删除。');
     }
     await writeJSON(p.config,config);
   }finally{await releaseLock(p);}
-  console.log('配置已保存，正在检查 Codex 登录和网络……');
+  console.log('配置已保存，正在检查当前引擎……');
   await doctor(config);
   await foreground(['--login']);
   console.log('配置完成！现在执行 wx-codex start 即可。');
@@ -127,7 +154,20 @@ async function status() {
   const state=await running();
   if(!state){const phase=await busy()?'starting':'stopped';console.log(process.argv.includes('--json')?JSON.stringify({service:'wx-codex',status:phase}):phase==='starting'?'状态：启动或配置中，管理接口尚不可用':'状态：已停止');return;}
   if(process.argv.includes('--json')){console.log(JSON.stringify(state));return;}
-  console.log(`状态：运行中\nPID：${state.pid}\n运行时长：${Math.floor((Date.now()-state.startedAt)/1000)} 秒\n微信：${state.wechatBound?'已绑定':'未绑定'}\n最近成功轮询：${state.lastPollAt?new Date(state.lastPollAt).toLocaleString():'等待首次响应'}\nCodex：${state.codexConnected?'本机服务已连接':'未连接'}\n任务：${state.task}\n工作目录：${state.workspace || '回声模式'}`);
+  console.log(`状态：运行中\nPID：${state.pid}\n运行时长：${Math.floor((Date.now()-state.startedAt)/1000)} 秒\n微信：${state.wechatBound?'已绑定':'未绑定'}\n最近成功轮询：${state.lastPollAt?new Date(state.lastPollAt).toLocaleString():'等待首次响应'}\n引擎：${state.engine || 'codex'}\n引擎状态：${(state.agentReady ?? state.codexConnected)?'本机适配器已就绪':'未连接'}\n任务：${state.task}\n工作目录：${state.workspace || '回声模式'}`);
+}
+async function engine() {
+  const config=await readJSON(p.config,{});
+  const next=process.argv[3];
+  if(!next){console.log(`当前默认引擎：${config.engine || 'codex'}`);return;}
+  engineName(next);
+  if(!config.workspace)throw new Error('请先运行 wx-codex setup');
+  await doctor({...config,engine:next});
+  const wasRunning=!!await running();if(wasRunning)await stop();
+  await privateDir(p.dir);await acquireLock(p);
+  try {await writeJSON(p.config,{...config,engine:next});}finally{await releaseLock(p);}
+  console.log(`默认引擎已设置为 ${next}，两个引擎的会话独立保留。`);
+  if(wasRunning)await start();
 }
 async function logs() {
   let position=0;
@@ -165,10 +205,10 @@ async function migrate() {
 try {
   if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
-  const commands={setup,start,stop,restart:async()=>{await stop();await start();},status,logs,doctor,
+  const commands={setup,start,stop,engine,restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-codex stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.5.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.6.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-codex --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

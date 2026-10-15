@@ -23,6 +23,20 @@ export function codexCommand(args, {platform=process.platform,env=process.env,ex
   }
   throw new Error('未找到 Codex：请运行 npm.cmd install -g @openai/codex，或用 CODEX_BINARY 指定 codex.exe 的完整路径');
 }
+export function claudeCommand(args,{platform=process.platform,env=process.env,exists=fs.existsSync,node=process.execPath}={}) {
+  const explicit=env.CLAUDE_BINARY;
+  if(explicit)return codexCommand(args,{platform,env:{CODEX_BINARY:explicit},exists,node});
+  if(platform!=='win32')return {file:'claude',args};
+  const key=Object.keys(env).find(k=>k.toLowerCase()==='path');
+  for(const raw of (env[key] || '').split(';')) {
+    const dir=raw.replace(/^"|"$/g,'');if(!dir)continue;
+    const exe=path.win32.join(dir,'claude.exe');if(exists(exe))return {file:exe,args};
+    const entry=path.win32.join(dir,'node_modules','@anthropic-ai','claude-code','cli.js');
+    if(exists(path.win32.join(dir,'claude.cmd')) && exists(entry))return {file:node,args:[entry,...args]};
+  }
+  throw new Error('未找到 Claude Code，请先安装，或设置 CLAUDE_BINARY 为原生可执行文件路径');
+}
+
 export function stopChild(child,{platform=process.platform,exec=execFileSync}={}) {
   if(child.exitCode!=null || child.signalCode!=null)return;
   if(platform==='win32' && child.pid) {

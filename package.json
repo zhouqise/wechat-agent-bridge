@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,7 +16,7 @@
   "dependencies": {
     "qrcode": "1.5.4"
   },
-  "description": "在个人微信中使用本机 Codex：扫码配置、后台运行、任务状态与审批",
+  "description": "微信连接本机 Codex / Claude Code：双引擎切换、截图分析、审批与后台管理",
   "bin": {
     "wx-codex": "wx-codex.mjs"
   },
@@ -32,7 +32,9 @@
     "LICENSE",
     "SECURITY.md",
     "media.mjs",
-    "platform.mjs"
+    "platform.mjs",
+    "claude.mjs",
+    "engines.mjs"
   ],
   "os": [
     "darwin",

@@ -29,9 +29,13 @@ jobs:
         run: npm install -g @openai/codex@0.159.2 --ignore-scripts
       - name: Verify native or npm Codex launcher
         run: node --input-type=module -e "import {codexCommand} from './platform.mjs'; import {execFileSync} from 'node:child_process'; const c=codexCommand(['--version']); console.log(execFileSync(c.file,c.args,{encoding:'utf8',timeout:20000,windowsHide:true}));"
+      - name: Install and verify Claude Code launcher (no login)
+        run: |
+          npm install -g @anthropic-ai/claude-code@2.1.121 --ignore-scripts
+          node --input-type=module -e "import {claudeCommand} from './platform.mjs'; import {execFileSync} from 'node:child_process'; const c=claudeCommand(['--version']); console.log(execFileSync(c.file,c.args,{encoding:'utf8',timeout:20000,windowsHide:true}));"
       - name: Verify installable package
         run: |
           npm pack
-          npm install -g ./wx-codex-bridge-0.5.0.tgz --ignore-scripts
+          npm install -g ./wx-codex-bridge-0.6.0.tgz --ignore-scripts
           wx-codex --version
           wx-codex --help

@@ -42,3 +42,40 @@ createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line)
     await fs.rm(dir,{recursive:true,force:true});
   }
 });
+test('微信切换双引擎保留会话，Claude 任务完成，切换失败保留原引擎',{timeout:60000},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'wxe-'));
+  const mock=path.join(dir,'agent.mjs'),preload=path.join(dir,'offline.mjs');
+  await fs.writeFile(mock,`import fs from 'node:fs';import {createInterface} from 'node:readline';
+if(process.argv.includes('--version')){if(fs.existsSync(process.env.MOCK_FAIL))process.exit(1);console.log('mock');process.exit(0);}
+createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);
+const send=x=>process.stdout.write(JSON.stringify(x)+'\\n');
+if(m.id!==undefined)send({id:m.id,result:{}});
+if(m.type==='control_request')send({type:'control_response',response:{request_id:m.request_id,subtype:'success',response:{}}});
+if(m.type==='user')send({type:'result',subtype:'success',is_error:false,result:'claude-mock'});
+});`);
+  await fs.writeFile(preload,`import fs from 'node:fs';
+globalThis.fetch=async(url,options)=>{await new Promise(r=>setTimeout(r,50));let msgs=[];
+if(url.includes('getupdates')){try{msgs=JSON.parse(fs.readFileSync(process.env.MOCK_INBOX,'utf8'));fs.writeFileSync(process.env.MOCK_INBOX,'[]');}catch{}}
+else if(url.includes('sendmessage'))fs.appendFileSync(process.env.MOCK_REPLIES,JSON.parse(options.body).msg.item_list[0].text_item.text+'\\n');
+return new Response(JSON.stringify({ret:0,msgs}),{headers:{'content-type':'application/json'}});};`);
+  const env={...process.env,WX_CODEX_HOME:dir,CODEX_BINARY:mock,CLAUDE_BINARY:mock,MOCK_FAIL:path.join(dir,'fail'),MOCK_INBOX:path.join(dir,'inbox.json'),MOCK_REPLIES:path.join(dir,'replies.txt'),NODE_OPTIONS:'--import='+pathToFileURL(preload).href};
+  const run=async(...args)=>(await exec(process.execPath,[cli,...args],{cwd:os.tmpdir(),env,timeout:20000,windowsHide:true})).stdout;
+  async function waitFor(check){for(let i=0;i<60;i++){if(await check())return;await new Promise(r=>setTimeout(r,100));}throw Error('condition timed out');}
+  let id=0;
+  const send=async text=>fs.writeFile(env.MOCK_INBOX,JSON.stringify([{from_user_id:'test-user',message_id:++id,message_type:1,message_state:2,context_token:'test',item_list:[{type:1,text_item:{text}}]}]));
+  const state=async()=>JSON.parse(await fs.readFile(path.join(dir,'session.json'),'utf8'));
+  try {
+    await fs.writeFile(path.join(dir,'config.json'),JSON.stringify({workspace:path.join(dir,'workspace'),engine:'codex'}));
+    await fs.writeFile(path.join(dir,'session.json'),JSON.stringify({token:'test-only',owner:'test-user',seen:[],base:'https://ilinkai.weixin.qq.com',codex:{threadId:'saved-codex'},claude:{threadId:'saved-claude'}}));
+    await run('start');await send('/引擎 claude');
+    await waitFor(async()=>JSON.parse(await run('status','--json')).engine==='claude');
+    assert.equal((await state()).codex.threadId,'saved-codex');
+    await send('hello');await waitFor(async()=>(await state()).claude.lastResult?.includes('claude-mock'));
+    await send('/引擎 codex');await waitFor(async()=>JSON.parse(await run('status','--json')).engine==='codex');
+    assert.equal((await state()).claude.threadId,'saved-claude');
+    await fs.writeFile(env.MOCK_FAIL,'fail');await send('/引擎 claude');
+    await waitFor(async()=>(await fs.readFile(env.MOCK_REPLIES,'utf8')).includes('引擎切换失败'));
+    assert.equal(JSON.parse(await run('status','--json')).engine,'codex');
+    assert.equal(JSON.parse(await fs.readFile(path.join(dir,'config.json'),'utf8')).engine,'codex');
+  }finally{await run('stop').catch(()=>{});await fs.rm(dir,{recursive:true,force:true});}
+});
