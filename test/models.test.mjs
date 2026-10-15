@@ -8,10 +8,15 @@ test('Codex 列表读取 model ID，过滤隐藏/非法项并去重',async()=>{
 test('API 不误用 Codex 官方目录，Claude 别名标明非授权清单',async()=>{
  const text=await modelListText({codexAuth:'api'},'codex',{request:()=>{throw Error('must not call');}});
  assert.match(text,/服务商控制台/);
- const claude=await modelListText({},'claude');assert.match(claude,/\/模型 sonnet/);assert.match(claude,/不是账号授权清单/);
+ const claude=await modelListText({},'claude',{request:async()=>{throw Error('unavailable');}});assert.match(claude,/\/模型 sonnet/);assert.match(claude,/不是账号授权清单/);
 });
 test('目录失败/空结果不抛出底层错误或改变当前模型',async()=>{
  for(const rpc of [{request:async()=>{throw Error('private-secret');}},{request:async()=>({data:[]})}]) {
  const config={codexModel:'keep'};const text=await modelListText(config,'codex',rpc);assert.match(text,/暂时无法/);assert.ok(!text.includes('private-secret'));assert.equal(config.codexModel,'keep');
  }
+});
+
+test('Claude 使用真实目录，支持上下文后缀并区分最近实际模型',async()=>{
+ const text=await modelListText({claudeModel:'sonnet[1m]'},'claude',{request:async()=>({data:[{model:'default'},{model:'sonnet[1m]'},{model:'haiku'}],currentModel:'claude-actual'})});
+ assert.match(text,/\/模型 sonnet\[1m\]/);assert.match(text,/\/模型 haiku/);assert.match(text,/最近任务实际模型：claude-actual/);assert.ok(!text.includes('备用'));
 });

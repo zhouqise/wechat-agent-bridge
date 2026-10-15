@@ -75,3 +75,23 @@ test('API 模式仅向子进程传密钥，不加载本机用户配置，不写�
   assert.equal(captured.options.env.ANTHROPIC_API_KEY,'test-key-never-real');
   assert.equal(captured.args.some(a=>a.includes('test-key-never-real')),false);
 });
+test('Claude 模型目录只初始化独立子进程，不发送任务，完成后清理',async()=>{
+ let child,written='',args;
+ const rpc=new ClaudeRPC({cwd:process.cwd(),binary:'fake-claude.exe',spawnFn:(file,a)=>{args=a;child=mock();child.stdin.on('data',b=>written+=b);return child;}});
+ rpc.observedModel='claude-observed';
+ const pending=rpc.request('model/list');
+ child.stdout.write(JSON.stringify({type:'control_response',response:{request_id:'catalog',subtype:'success',response:{models:[{value:'sonnet[1m]',displayName:'Sonnet'}],account:{secret:'must-not-return'}}}})+'\n');
+ const result=await pending;
+ assert.equal(result.data[0].model,'sonnet[1m]');assert.equal(result.currentModel,'claude-observed');
+ assert.ok(!JSON.stringify(result).includes('must-not-return'));assert.ok(args.includes('--no-session-persistence'));
+ assert.equal(JSON.parse(written).request.subtype,'initialize');assert.ok(!written.includes('"type":"user"'));assert.equal(child.killed,true);assert.equal(rpc.run,undefined);rpc.close();
+});
+test('模型目录子进程退出或关闭时拒绝查询，不影响任务状态',async()=>{
+ let child;const rpc=new ClaudeRPC({binary:'fake-claude.exe',spawnFn:()=>{child=mock();return child;}});
+ const pending=rpc.request('model/list');child.emit('exit');await assert.rejects(pending,/目录查询失败/);
+ const next=rpc.request('model/list');rpc.close();await assert.rejects(next,/目录查询失败/);assert.equal(child.killed,true);
+});
+test('实际模型仅从匹配会话的 system/init 读取',async t=>{
+ const {rpc}=await setup(t);await rpc.message(rpc.run,{type:'system',subtype:'init',session_id:'wrong',model:'wrong-model'});assert.equal(rpc.observedModel,undefined);
+ await rpc.message(rpc.run,{type:'system',subtype:'init',session_id:rpc.threadId,model:'actual-model'});assert.equal(rpc.observedModel,'actual-model');
+});

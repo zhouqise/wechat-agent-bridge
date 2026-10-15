@@ -4,16 +4,16 @@
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
 
-从 v0.9.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
+从 v0.9.1 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
 
 ## 安装
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.9.0：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.9.1：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.0/wx-codex-bridge-0.9.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.1/wx-codex-bridge-0.9.1.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.0/wx-codex-bridge-0.9.0.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.1/wx-codex-bridge-0.9.1.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -125,7 +125,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.0/wx-codex-bridge-0.9.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.1/wx-codex-bridge-0.9.1.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -211,7 +211,7 @@ wx-agent.cmd start
 
 切换只保存模型选择，不提前发起推理或验证账号额度；若服务商拒绝模型，请改回可用模型后重试。模型切换不会改变引擎、认证方式或 API 地址。
 
-`/模型` 和 `wx-agent model` 现在同时显示模型列表：Codex 本机模式从 app-server 获取目录；Claude 显示 CLI 常用别名 sonnet/opus（不是授权清单）。Codex API 模式提示到服务商控制台确认，不将官方目录误作第三方服务商可用模型。目录获取失败时保留当前设置，仍可输入已知 ID。
+`/模型` 和 `wx-agent model` 现在同时显示模型列表：Codex 本机模式从 app-server 获取目录；Claude 通过独立 CLI 初始化读取模型目录（不提交推理任务），查询失败时才显示备用别名。Codex API 模式提示到服务商控制台确认，不将官方目录误作第三方服务商可用模型。目录获取失败时保留当前设置，仍可输入已知 ID。
 
 ## 语音和视频
 
@@ -222,3 +222,5 @@ wx-agent.cmd start
 视频需要 FFmpeg（包含 ffprobe）。macOS 可运行 `brew install ffmpeg`；Windows/Linux 按 [FFmpeg 官方说明](https://ffmpeg.org/download.html) 安装并加入 PATH，也可通过 FFMPEG_BINARY、FFPROBE_BINARY 指定绝对路径（Windows 使用 .exe）。随后运行 `wx-agent media-check`；修改环境变量后重启桥接。
 
 处理期间可以 `/状态`、`/取消`。临时视频和帧文件在完成、失败或正常停止后删除；微信转写文字和视频抽样画面交给所选模型服务，可能保存在该引擎会话记录中。无须语音识别 API Key 或离线模型。
+
+Claude 的 `/模型` 现在从 CLI 初始化响应读取真实模型目录，支持 `sonnet[1m]` 等带上下文后缀的名称。列表仍由 CLI/服务配置决定，不保证账号额度。显示的“最近任务实际模型”来自最近一次任务的 system/init 事件；尚无任务或刚切换模型时明确显示未确认，不将别名猜测为实际模型。目录查询不会发送用户任务，不修改已有会话，独立查询进程在完成或超时后退出。

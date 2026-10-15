@@ -43,8 +43,45 @@ export class ClaudeRPC extends EventEmitter {
     try{await this.check(c.file,c.args,{cwd:this.cwd,env:this.env,windowsHide:true,timeout:10000});}
     catch{throw new Error('Claude Code 不可用，请在电脑上安装并登录 Claude Code 后重试');}
   }
+  async listModels() {
+    if(this.catalogPromise)return this.catalogPromise;
+    const args=['-p','--input-format','stream-json','--output-format','stream-json','--verbose',
+      '--permission-prompt-tool','stdio','--setting-sources',this.auth==='local'?'user':'',
+      '--settings','{"disableAllHooks":true}','--strict-mcp-config','--mcp-config','{"mcpServers":{}}',
+      '--tools','','--no-chrome','--disable-slash-commands','--no-session-persistence'];
+    if(this.model)args.push('--model',this.model);
+    const command=claudeCommand(args,{env:this.env});
+    this.catalogPromise=new Promise((resolve,reject)=>{
+      let child,lines,timer,done=false;
+      const finish=(error,models)=>{
+        if(done)return;done=true;clearTimeout(timer);lines?.close();if(child)stopChild(child);this.catalogCancel=null;
+        if(error)reject(new Error('Claude 模型目录查询失败'));else resolve({data:models.map(m=>({...m,model:m.value})),currentModel:this.observedModel || null});
+      };
+      this.catalogCancel=()=>finish(true);
+      try {
+        child=this.spawnFn(command.file,command.args,{cwd:this.cwd,env:this.env,stdio:['pipe','pipe','pipe'],shell:false,windowsHide:true});
+        lines=createInterface({input:child.stdout});child.stderr.on('data',()=>{});
+        child.on('error',()=>finish(true));child.on('exit',()=>finish(true));child.stdin.on('error',()=>finish(true));
+        lines.on('line',line=>{
+          if(line.length>1024*1024)return finish(true);
+          let m;try{m=JSON.parse(line);}catch{return;}
+          if(m.type==='control_response' && m.response?.request_id==='catalog') {
+            const models=m.response.response?.models;
+            if(m.response.subtype!=='success' || !Array.isArray(models) || !models.length)return finish(true);
+            finish(false,models);
+          } else if(m.type==='control_request') {
+            child.stdin.write(JSON.stringify({type:'control_response',response:{subtype:'error',request_id:m.request_id,error:'Read-only model discovery'}})+'\n');
+          }
+        });
+        timer=setTimeout(()=>finish(true),6000);
+        child.stdin.write(JSON.stringify({type:'control_request',request_id:'catalog',request:{subtype:'initialize',hooks:{}}})+'\n');
+      }catch{finish(true);}
+    });
+    try{return await this.catalogPromise;}finally{this.catalogPromise=null;}
+  }
   async request(method,p={}) {
     if(this.closed)throw new Error('Claude 适配器已关闭');
+    if(method==='model/list')return this.listModels();
     if(method==='thread/start' || method==='thread/resume') {
       if(this.run)throw new Error('任务仍在执行');
       this.threadId=p.threadId || randomUUID();this.resume=method==='thread/resume';this.instructions=p.developerInstructions;
@@ -89,7 +126,7 @@ export class ClaudeRPC extends EventEmitter {
       this.write(run,{type:'user',session_id:run.threadId,message:{role:'user',content:run.content},parent_tool_use_id:null});
       run.content=null;return;
     }
-    if(m.type==='system' && m.subtype==='init' && m.session_id===run.threadId){this.resume=true;return;}
+    if(m.type==='system' && m.subtype==='init' && m.session_id===run.threadId){this.resume=true;if(typeof m.model==='string')this.observedModel=m.model;return;}
     if(m.type==='control_request') {
       const r=m.request;
       if(r?.subtype!=='can_use_tool' || !TOOLS.includes(r.tool_name))return this.write(run,{type:'control_response',response:{subtype:'error',request_id:m.request_id,error:'Unsupported request'}});
@@ -121,5 +158,5 @@ export class ClaudeRPC extends EventEmitter {
     this.notify(run,'item/completed',{item:{id:run.turnId,type:'agentMessage',phase:'final_answer',text}});
     this.notify(run,'turn/completed',{turn:{id:run.turnId,status}});
   }
-  close() {this.closed=true;if(this.run)this.finish(this.run,'interrupted','桥接已停止。');}
+  close() {this.closed=true;this.catalogCancel?.();if(this.run)this.finish(this.run,'interrupted','桥接已停止。');}
 }
