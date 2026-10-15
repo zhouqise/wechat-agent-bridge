@@ -23,7 +23,10 @@ createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line)
   try {
     await fs.writeFile(path.join(dir,'config.json'),JSON.stringify({workspace:path.join(dir,'workspace')}));
     await fs.writeFile(path.join(dir,'session.json'),JSON.stringify({token:'test-only',owner:'test-user',seen:[],base:'https://ilinkai.weixin.qq.com'}));
+    // Old updater releases the runtime lock before restart but retains update.lock.
+    await fs.writeFile(path.join(dir,'update.lock'),String(process.pid));
     await run('start');
+    await fs.rm(path.join(dir,'update.lock'));
     const first=JSON.parse(await run('status','--json'));assert.equal(first.codexConnected,true);
     childPid=Number(await fs.readFile(env.WX_TEST_PID,'utf8'));
     assert.match(await run('start'),/已经运行/);

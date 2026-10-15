@@ -13,7 +13,7 @@
 直接在终端执行以下命令，安装 GitHub Release 中的 v0.13.1：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.0/wx-codex-bridge-0.15.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.1/wx-codex-bridge-0.15.1.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.0/wx-codex-bridge-0.15.0.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.1/wx-codex-bridge-0.15.1.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -129,7 +129,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.0/wx-codex-bridge-0.15.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.1/wx-codex-bridge-0.15.1.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
