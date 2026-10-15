@@ -8,7 +8,7 @@ import {promisify} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {alive,paths} from '../paths.mjs';
 const exec=promisify(execFile);
-const cli=fileURLToPath(new URL('../wx-codex.mjs',import.meta.url));
+const cli=fileURLToPath(new URL('../wx-agent.mjs',import.meta.url));
 test('真实后台进程：异目录启动、状态、重复启动、重启、停止，禁止外网', {timeout:60000},async()=>{
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'wxd-'));
   const mock=path.join(dir,'codex fixture.mjs'),preload=path.join(dir,'offline.mjs');

@@ -13,6 +13,6 @@ export function engineState(state,engine,cwd) {
 export function makeController({engine,cwd,config,state,save,send}) {
   engineName(engine);
   const proxy=process.env[engine==='codex'?'BRIDGE_CODEX_PROXY':'BRIDGE_CLAUDE_PROXY'] || config[engine==='codex'?'codexProxy':'claudeProxy'];
-  const rpc=engine==='codex'?new CodexRPC({cwd,proxy}):new ClaudeRPC({cwd,proxy,auth:config.claudeAuth || 'local'});
+  const rpc=engine==='codex'?new CodexRPC({cwd,proxy,config}):new ClaudeRPC({cwd,proxy,auth:config.claudeAuth || 'local'});
   return new Controller({rpc,cwd,state:engineState(state,engine,cwd),save,send,label:engine==='codex'?'Codex':'Claude Code'});
 }

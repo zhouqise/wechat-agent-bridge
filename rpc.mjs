@@ -1,11 +1,13 @@
+import {codexSettings} from './codex-config.mjs';
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import {EventEmitter} from 'node:events';
 import {codexCommand,stopChild} from './platform.mjs';
 
 export class CodexRPC extends EventEmitter {
-  constructor({cwd, binary, spawnFn = spawn, proxy = process.env.BRIDGE_CODEX_PROXY} = {}) {
+  constructor({cwd, config = {}, binary, spawnFn = spawn, proxy = process.env.BRIDGE_CODEX_PROXY} = {}) {
     super(); this.next = 1; this.pending = new Map(); this.closed = false;
+    this.settings=codexSettings(config);
     const env = {...process.env};
     if (proxy) {
       const u = new URL(proxy);
@@ -13,7 +15,7 @@ export class CodexRPC extends EventEmitter {
       env.HTTPS_PROXY = env.HTTP_PROXY = env.ALL_PROXY = proxy;
       env.https_proxy = env.http_proxy = env.all_proxy = proxy;
     }
-    const command=codexCommand(['app-server','--stdio'],{env:binary?{...env,CODEX_BINARY:binary}:env});
+    const command=codexCommand(['app-server','--stdio',...this.settings.args],{env:binary?{...env,CODEX_BINARY:binary}:env});
     this.child = spawnFn(command.file, command.args, {cwd, env, stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide:true});
     // stderr 可能包含本机路径或工具配置，禁止直接回传微信。
     this.child.stderr.on('data', () => {});
@@ -41,6 +43,7 @@ export class CodexRPC extends EventEmitter {
     this.child.stdin.write(JSON.stringify(message) + '\n');
   }
   request(method, params = {}) {
+    if(this.settings.auth==='api' && ['thread/start','thread/resume'].includes(method))params={...params,model:this.settings.model,modelProvider:'wx_agent_api'};
     return new Promise((resolve, reject) => {
       const id = this.next++;
       const timer = setTimeout(() => {this.pending.delete(id); reject(new Error(`Codex 请求超时：${method}`));}, 60000);
@@ -51,7 +54,7 @@ export class CodexRPC extends EventEmitter {
   respond(id, result) {this.write({id, result});}
   reject(id) {this.write({id, error: {code: -32601, message: 'Unsupported client request'}});}
   async initialize() {
-    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.6.1'}});
+    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.7.0'}});
     this.write({method:'initialized', params:{}});
   }
   close() {stopChild(this.child); this.fail(); this.lines.close();}

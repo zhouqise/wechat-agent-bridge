@@ -1,5 +1,11 @@
 # 更新记录
 
+## 0.7.0
+
+- 移除 wx-codex 命令，仅保留 wx-agent；配置和用户数据目录保留。
+- Codex 新增 API Key、接口地址、模型 ID 和密钥环境变量配置；支持 Responses 兼容服务。
+- API 模式不回退本机登录，恢复会话显式指定 provider；doctor 不发起付费请求。
+
 ## 0.6.1
 
 - 新增统一命令 `wx-agent`，同时管理 Codex 和 Claude Code。

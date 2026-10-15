@@ -1,14 +1,14 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node wx-codex.mjs start",
-    "stop": "node wx-codex.mjs stop",
-    "status": "node wx-codex.mjs status",
+    "start": "node wx-agent.mjs start",
+    "stop": "node wx-agent.mjs stop",
+    "status": "node wx-agent.mjs status",
     "test": "node --test",
-    "dev": "node wx-codex.mjs run"
+    "dev": "node wx-agent.mjs run"
   },
   "engines": {
     "node": ">=22"
@@ -18,11 +18,10 @@
   },
   "description": "微信连接本机 Codex / Claude Code：双引擎切换、截图分析、审批与后台管理",
   "bin": {
-    "wx-agent": "wx-codex.mjs",
-    "wx-codex": "wx-codex.mjs"
+    "wx-agent": "wx-agent.mjs"
   },
   "files": [
-    "wx-codex.mjs",
+    "wx-agent.mjs",
     "cli.mjs",
     "paths.mjs",
     "service.mjs",
@@ -35,7 +34,8 @@
     "media.mjs",
     "platform.mjs",
     "claude.mjs",
-    "engines.mjs"
+    "engines.mjs",
+    "codex-config.mjs"
   ],
   "os": [
     "darwin",

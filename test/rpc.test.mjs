@@ -24,3 +24,19 @@ test('服务器请求与通知独立分发，进程退出拒绝等待中的请�
   assert.equal(approval.id,99);assert.equal(notification.method,'turn/completed');
   const pending=rpc.request('pending');child.emit('exit');await assert.rejects(pending,/断开/);rpc.close();
 });
+
+test('API provider 密钥只在环境中，恢复会话明确使用新 provider 和模型', async()=>{
+  const old=process.env.WX_TEST_API_KEY;process.env.WX_TEST_API_KEY='fake-private-test-key';
+  let args,options;
+  const child=new EventEmitter();child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{};
+  const rpc=new CodexRPC({config:{codexAuth:'api',codexModel:'test-model',codexBaseUrl:'https://example.com/v1',codexApiKeyEnv:'WX_TEST_API_KEY'},spawnFn:(bin,a,o)=>{args=a;options=o;return child;}});
+  try {
+    assert.equal(options.env.WX_TEST_API_KEY,'fake-private-test-key');
+    assert.ok(!JSON.stringify(args).includes('fake-private-test-key'));
+    assert.match(args.join(' '),/requires_openai_auth = false/);
+    let wire='';child.stdin.on('data',b=>wire+=b);
+    const result=rpc.request('thread/resume',{threadId:'existing',model:'old',modelProvider:'openai'});
+    const message=JSON.parse(wire);assert.equal(message.params.model,'test-model');assert.equal(message.params.modelProvider,'wx_agent_api');
+    child.stdout.write(JSON.stringify({id:message.id,result:{thread:{id:'existing'}}})+'\n');await result;
+  }finally {rpc.close();if(old===undefined)delete process.env.WX_TEST_API_KEY;else process.env.WX_TEST_API_KEY=old;}
+});

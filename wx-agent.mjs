@@ -7,6 +7,7 @@ import {promisify} from 'node:util';
 import {createInterface} from 'node:readline/promises';
 import {paths,privateDir,readJSON,writeJSON,alive,acquireLock,releaseLock} from './paths.mjs';
 import {control} from './service.mjs';
+import {codexSettings} from './codex-config.mjs';
 import {CodexRPC} from './rpc.mjs';
 import {codexCommand,claudeCommand} from './platform.mjs';
 import {ClaudeRPC} from './claude.mjs';
@@ -32,7 +33,6 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
   paths          显示数据目录
   --version      显示版本
 
-兼容旧命令 wx-codex，两者使用相同配置和会话。
 配置和凭证独立保存，升级或卸载 npm 包不会删除它们。
 支持 macOS / Linux / Windows。未注册开机自启。`;
 
@@ -68,9 +68,11 @@ async function doctor(config=undefined) {
     } else console.log('Claude：ANTHROPIC_API_KEY 已配置（未验证密钥有效性或额度）');
     return;
   }
-  const rpc=new CodexRPC({cwd,proxy:process.env.BRIDGE_CODEX_PROXY || config.codexProxy});
+  const rpc=new CodexRPC({cwd,config,proxy:process.env.BRIDGE_CODEX_PROXY || config.codexProxy});
   try {
-    await rpc.initialize();const auth=await rpc.request('account/read',{refreshToken:false});
+    await rpc.initialize();
+    if(codexSettings(config).auth==='api') {console.log('Codex API：配置与本机适配器已验证（未验证密钥、额度或远端模型兼容性）');return;}
+    const auth=await rpc.request('account/read',{refreshToken:false});
     if(!auth.account)throw new Error('Codex 尚未登录，请执行 codex login 后重试');
     console.log('Codex 登录：有效（不代表模型请求已验证）');
   }finally{rpc.close();}
@@ -94,6 +96,17 @@ async function setup() {
   try {
     const engine=engineName((await rl.question(`引擎 codex / claude（回车使用 ${old.engine || 'codex'}）：`)).trim().toLowerCase() || old.engine || 'codex');
     await prerequisites(engine);
+    let codexAuth=old.codexAuth || 'local',codexBaseUrl=old.codexBaseUrl || '',codexModel=old.codexModel || '',codexApiKeyEnv=old.codexApiKeyEnv || 'OPENAI_API_KEY';
+    if(engine==='codex') {
+      codexAuth=(await rl.question(`Codex 认证 local（已有登录/配置）/ api（API Key），回车使用 ${codexAuth}：`)).trim() || codexAuth;
+      if(!['local','api'].includes(codexAuth))throw new Error('认证方式请输入 local 或 api');
+      if(codexAuth==='api') {
+        codexBaseUrl=(await rl.question(`API 基础地址（回车使用 ${codexBaseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'}）：`)).trim() || codexBaseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+        codexModel=(await rl.question(`模型 ID（回车使用 ${codexModel || process.env.OPENAI_MODEL || '未设置，请输入服务商提供的模型 ID'}）：`)).trim() || codexModel || process.env.OPENAI_MODEL || '';
+        codexApiKeyEnv=(await rl.question(`密钥环境变量名称（回车使用 ${codexApiKeyEnv}，不要输入密钥本身）：`)).trim() || codexApiKeyEnv;
+        console.log('密钥只从指定环境变量读取；接口须支持 Responses API。');
+      }
+    }
     let claudeAuth=old.claudeAuth || 'local';
     if(engine==='claude') {
       claudeAuth=(await rl.question(`Claude 认证 local（本机登录）/ api（环境变量 API Key），回车使用 ${claudeAuth}：`)).trim() || claudeAuth;
@@ -107,12 +120,14 @@ async function setup() {
     if(proxy) {const u=new URL(proxy);if(!['http:','https:','socks5:','socks5h:'].includes(u.protocol)||u.username||u.password)throw new Error('请输入不含账号密码的 HTTP/SOCKS 代理地址');}
     const expanded=workspace.startsWith('~/')?path.join((await import('node:os')).homedir(),workspace.slice(2)):workspace;
     const full=path.resolve(expanded);await fs.mkdir(full,{recursive:true});
-    config={...old,engine,claudeAuth,workspace:await fs.realpath(full),[proxyField]:proxy};
+    config={...old,engine,codexAuth,codexBaseUrl,codexModel,codexApiKeyEnv,claudeAuth,workspace:await fs.realpath(full),[proxyField]:proxy};
+      if(engine==='codex')codexSettings(config);
   }finally{rl.close();}
   // 修改配置与启动共用锁，阻止配置向导和后台实例同时改变目录。
   await acquireLock(p);
   try {
     const session=await readJSON(p.session,null);
+    if(session && old.workspace===config.workspace && ['codexAuth','codexBaseUrl','codexModel','codexApiKeyEnv'].some(k=>old[k]!==config[k])) {session.codex={workspace:config.workspace};await writeJSON(p.session,session);}
     if(session && old.workspace!==config.workspace) {
       session.codex={workspace:config.workspace};session.claude={workspace:config.workspace};await writeJSON(p.session,session);
       console.log('工作目录变化，已为新目录清空会话引用，原工作文件未删除。');
@@ -211,7 +226,7 @@ try {
   const commands={setup,start,stop,engine,restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.6.1'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.7.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

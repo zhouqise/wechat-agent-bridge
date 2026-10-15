@@ -4,16 +4,16 @@
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
 
-GitHub 仓库已更名为 `wechat-agent-bridge`。从 v0.6.1 起推荐使用 `wx-agent`；旧命令 `wx-codex` 作为兼容别名继续可用，两者操作同一服务、配置和会话。安装包名和用户数据目录保持不变。旧版本用户升级后即可使用新命令。
+从 v0.7.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
 
 ## 安装
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.6.1：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.7.0：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.1/wx-codex-bridge-0.6.1.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.7.0/wx-codex-bridge-0.7.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.1/wx-codex-bridge-0.6.1.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.7.0/wx-codex-bridge-0.7.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -76,7 +76,7 @@ wx-agent paths      # 查看数据保存位置
 
 更换项目：先 `wx-agent stop`，再 `wx-agent setup` 选择新目录，最后 `wx-agent start`。目录变更会清空桥接使用的旧会话引用，工作文件不删除。普通重启会保留上下文，但不会自动重跑中断的任务。
 
-升级：停止后安装新的 tgz，再启动。配置与凭据独立于安装目录，不受包更新影响。旧版 0.2 用户需停止旧进程，在旧源码目录运行 `node wx-codex.mjs migrate`，导入绑定、代理和会话；旧工作区和旧状态文件保留。安装包中不包含任何人的配置或凭据。
+升级：停止后安装新的 tgz，再启动。配置与凭据独立于安装目录，不受包更新影响。旧版 0.2 用户需停止旧进程，在旧源码目录运行 `node wx-agent.mjs migrate`，导入绑定、代理和会话；旧工作区和旧状态文件保留。安装包中不包含任何人的配置或凭据。
 
 微信登录过期：`wx-agent stop` → `wx-agent login --force` → `wx-agent start`。强制登录会将旧会话保存为 `session.json.backup`，重新扫码会建立新绑定及新上下文。
 
@@ -125,7 +125,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.6.1/wx-codex-bridge-0.6.1.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.7.0/wx-codex-bridge-0.7.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -172,3 +172,33 @@ wx-agent.cmd start
 Claude 当前开放 Read、Glob、Grep、Bash、Edit、Write 六种工具，调用前均须微信单次确认。文件工具拒绝配置工作区外的路径；Bash 获批后以当前用户权限执行，不等同于 Codex 的 workspace-write 操作系统沙箱。hooks、外部 MCP、技能入口及 Chrome 集成关闭，其他交互默认拒绝。需要完整展示工具参数，详情过长会拒绝执行。
 
 本机认证已验证文字、图像输入、会话恢复与 Read 审批；API Key 模式已验证配置及协议，未使用真实 API Key 做计费请求。微信手机端的引擎切换完整链路仍待用户验证。CLI 流式控制协议可能随上游版本改变，发生不兼容时请提交脱敏的问题描述。
+
+## Codex API Key 与自定义接口
+
+`wx-agent setup` 选择 `codex` → `api`，依次配置 API 基础地址（例如 `https://api.openai.com/v1`）、服务商提供的模型 ID、密钥环境变量名称（默认 `OPENAI_API_KEY`）。先在自己的终端设置该环境变量，再运行 setup/start；密钥不填写在向导中，不写入桥接配置。
+
+macOS/Linux 示例：
+
+```sh
+export OPENAI_API_KEY='你的密钥'
+export OPENAI_BASE_URL='https://api.openai.com/v1'
+export OPENAI_MODEL='服务商提供的模型ID'
+wx-agent setup
+wx-agent start
+```
+
+Windows PowerShell：
+
+```powershell
+$env:OPENAI_API_KEY='你的密钥'
+$env:OPENAI_BASE_URL='https://api.openai.com/v1'
+$env:OPENAI_MODEL='服务商提供的模型ID'
+wx-agent.cmd setup
+wx-agent.cmd start
+```
+
+地址与模型以 setup 保存值优先，未配置时读取上述环境变量；密钥始终从指定环境变量读取。每次从新终端启动、重启或切换至 API 引擎时，需确保该终端已设置密钥。运行中的后台进程不会随终端后续环境变量修改而更新。
+
+接口须兼容 Responses API，不能直接使用仅兼容 Chat Completions 或 Anthropic Messages 的接口。HTTPS 为默认要求，本机回环地址允许 HTTP。`wx-agent doctor --engine codex` 在 API 模式只检查配置和本机 app-server 初始化，不验证密钥有效性、余额或远端模型兼容性，也不发起付费推理。
+
+选择 `local` 可继续沿用 Codex 自己的登录和配置。API 模式通过子进程参数指定独立 provider，不修改全局 Codex 配置，不将密钥放入命令参数，也不回退 ChatGPT 登录。修改认证方式、地址或模型后会重置桥接的 Codex 会话引用，原工作文件保留。配置字段依据 [Codex 官方配置参考](https://developers.openai.com/codex/config-reference/)。
