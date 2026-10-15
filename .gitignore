@@ -1,0 +1,15 @@
+node_modules/
+.state/
+pairing.png
+pairing.svg
+config.local.json
+workspace/
+*.tgz
+*.log
+.DS_Store
+session.json*
+config.json
+running.lock*
+control.sock
+.env
+.env.*

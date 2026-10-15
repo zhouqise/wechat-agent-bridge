@@ -1,0 +1,49 @@
+{
+  "name": "wx-codex-bridge",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node wx-codex.mjs start",
+    "stop": "node wx-codex.mjs stop",
+    "status": "node wx-codex.mjs status",
+    "test": "node --test",
+    "dev": "node wx-codex.mjs run"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "qrcode": "1.5.4"
+  },
+  "description": "在个人微信中使用本机 Codex：扫码配置、后台运行、任务状态与审批",
+  "bin": {
+    "wx-codex": "wx-codex.mjs"
+  },
+  "files": [
+    "wx-codex.mjs",
+    "cli.mjs",
+    "paths.mjs",
+    "service.mjs",
+    "bridge.mjs",
+    "controller.mjs",
+    "rpc.mjs",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "media.mjs"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhouqise/wx-codex-bridge.git"
+  },
+  "homepage": "https://github.com/zhouqise/wx-codex-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/zhouqise/wx-codex-bridge/issues"
+  }
+}

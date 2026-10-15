@@ -1,0 +1,37 @@
+import net from 'node:net';
+import fs from 'node:fs/promises';
+
+export function control(p,command='status') {
+  return new Promise((resolve,reject)=>{
+    const socket=net.createConnection(p.socket);let text='';
+    const timer=setTimeout(()=>{socket.destroy();reject(new Error('管理接口超时'));},2000);
+    socket.on('connect',()=>socket.write(JSON.stringify({command})+'\n'));
+    socket.on('data',buf=>{
+      text+=buf.toString();
+      if(text.length>32000){socket.destroy();return;}
+      if(text.includes('\n')) {try {const result=JSON.parse(text.split('\n')[0]);clearTimeout(timer);socket.destroy();resolve(result);}catch{clearTimeout(timer);socket.destroy();reject(new Error('管理接口响应异常'));}}
+    });
+    socket.on('error',e=>{clearTimeout(timer);reject(e);});
+    socket.on('close',()=>{clearTimeout(timer);reject(new Error('管理连接关闭'));});
+  });
+}
+export async function serve(p,status,stop) {
+  if(Buffer.byteLength(p.socket)>100)throw new Error('数据目录路径过长，请用 WX_CODEX_HOME 指定较短路径');
+  await fs.rm(p.socket,{force:true});
+  const server=net.createServer(socket=>{
+    let data='';socket.setTimeout(2000,()=>socket.destroy());
+    socket.on('error',()=>{});
+    socket.on('data',buf=>{
+      data+=buf.toString();if(data.length>1024){socket.destroy();return;}
+      if(!data.includes('\n'))return;
+      let command;try {command=JSON.parse(data.split('\n')[0]).command;}catch{socket.destroy();return;}
+      if(command==='status')socket.end(JSON.stringify({service:'wx-codex',...status()})+'\n');
+      else if(command==='stop') {socket.end(JSON.stringify({service:'wx-codex',stopping:true})+'\n');setTimeout(stop,100);}
+      else socket.end('{"error":"unknown command"}\n');
+      socket.removeAllListeners('data');
+    });
+  });
+  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(p.socket,resolve);});
+  await fs.chmod(p.socket,0o600);
+  return {close:async()=>{server.close();await fs.rm(p.socket,{force:true});}};
+}
