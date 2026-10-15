@@ -47,7 +47,7 @@ async function boundedBytes(response,maxBytes) {
   return Buffer.concat(chunks,total);
 }
 // Images stay in memory; Codex receives data URLs rather than CDN credentials or local paths.
-export async function imageInputs(items,{fetcher=fetch,maxBytes=10*1024*1024}={}) {
+export async function imageInputs(items,{fetcher=fetch,maxBytes=10*1024*1024,signal}={}) {
   const images=items.filter(i=>i.type===2);
   if(images.length>4)throw new MediaError('每条消息最多处理 4 张图片，请分批发送。');
   const inputs=[];let total=0;
@@ -55,7 +55,7 @@ export async function imageInputs(items,{fetcher=fetch,maxBytes=10*1024*1024}={}
     try {
       const image=item.image_item || {},media=image.media || {};
       const url=downloadURL(media),key=aesKey(image);
-      const response=await fetcher(url,{redirect:'error',signal:AbortSignal.timeout(30000)});
+      const response=await fetcher(url,{redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)});
       let bytes=await boundedBytes(response,maxBytes);
       if(key){try{const decipher=createDecipheriv('aes-128-ecb',key,null);bytes=Buffer.concat([decipher.update(bytes),decipher.final()]);}catch{throw new MediaError('图片解密失败，请重新发送截图。');}}
       total+=bytes.length;
@@ -64,4 +64,14 @@ export async function imageInputs(items,{fetcher=fetch,maxBytes=10*1024*1024}={}
     }catch(e){if(e instanceof MediaError)throw e;throw new MediaError('图片下载超时或连接失败，请稍后重新发送。');}
   }
   return inputs;
+}
+
+export async function downloadMedia(item,{fetcher=fetch,maxBytes=50*1024*1024,signal}={}) {
+  try {
+    const response=await fetcher(downloadURL(item.media || {}),{redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)});
+    let bytes=await boundedBytes(response,maxBytes);
+    const key=aesKey(item);
+    if(key){const d=createDecipheriv('aes-128-ecb',key,null);bytes=Buffer.concat([d.update(bytes),d.final()]);}
+    return bytes;
+  }catch {if(signal?.aborted)throw new MediaError('已取消媒体处理');throw new MediaError('媒体下载或解密失败，可能超过大小限制，请重新发送较短的语音或视频。');}
 }

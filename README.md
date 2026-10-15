@@ -4,16 +4,16 @@
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
 
-从 v0.8.1 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
+从 v0.9.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
 
 ## 安装
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.8.1：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.9.0：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.1/wx-codex-bridge-0.8.1.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.0/wx-codex-bridge-0.9.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.1/wx-codex-bridge-0.8.1.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.0/wx-codex-bridge-0.9.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -70,7 +70,7 @@ wx-agent paths      # 查看数据保存位置
 | `/拒绝 编号` | 拒绝操作 |
 | `/回答 编号 内容` | 回答非敏感问题 |
 
-同一时间只执行一个任务，忙碌时新任务不排队。当前处理绑定用户的私聊文字和直接发送的图片，不处理群聊、语音、视频或文件附件；不接管 Codex 桌面应用已有聊天。回复最多显示 16000 字，完整最近结果保存在本机状态中。
+同一时间只执行一个任务，忙碌时新任务不排队。当前处理绑定用户的私聊文字、图片、微信语音和 MP4 视频，不处理群聊或普通文件附件；不接管 Codex 桌面应用已有聊天。回复最多显示 16000 字，完整最近结果保存在本机状态中。
 
 ## 工作区、升级与恢复
 
@@ -125,7 +125,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.1/wx-codex-bridge-0.8.1.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.9.0/wx-codex-bridge-0.9.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -212,3 +212,15 @@ wx-agent.cmd start
 切换只保存模型选择，不提前发起推理或验证账号额度；若服务商拒绝模型，请改回可用模型后重试。模型切换不会改变引擎、认证方式或 API 地址。
 
 `/模型` 和 `wx-agent model` 现在同时显示模型列表：Codex 本机模式从 app-server 获取目录；Claude 显示 CLI 常用别名 sonnet/opus（不是授权清单）。Codex API 模式提示到服务商控制台确认，不将官方目录误作第三方服务商可用模型。目录获取失败时保留当前设置，仍可输入已知 ID。
+
+## 语音和视频
+
+直接发送微信语音或 MP4 视频，两种引擎均支持。语音优先使用微信附带转文字，否则使用本机 whisper.cpp 离线识别；支持常见微信 SILK、PCM16、MP3、AMR 和 WAV 编码。视频均匀抽取 6 帧并附时间标记，有音轨时尝试离线转写。画面抽样不能覆盖全部动作或细节。结果以文字回复，不发送合成语音或生成视频。
+
+每条消息最多一段语音或一个视频，最长 2 分钟；语音下载最多 4 MB，视频最多 50 MB。处理期间可 `/状态`、`/取消`。临时媒体和转写在处理完成或失败后删除；转写文字和抽样画面会交给所选模型服务，可能保存在该引擎的会话记录中。
+
+离线语音需要 FFmpeg（含 ffprobe）、whisper.cpp 的 whisper-cli 和多语言 GGML 模型。视频画面分析只需 FFmpeg；音轨识别缺失或失败时明确提示仅分析画面。微信已附转写的语音不需要这些组件。
+
+macOS 可执行 `brew install ffmpeg whisper-cpp`。Windows/Linux 请根据 [FFmpeg](https://ffmpeg.org/download.html) 和 [whisper.cpp](https://github.com/ggml-org/whisper.cpp) 官方说明安装或编译对应可执行文件，将其加入 PATH。也可通过 FFMPEG_BINARY、FFPROBE_BINARY、WHISPER_BINARY 指定绝对路径（Windows 使用 .exe，不使用 .cmd 包装器）。
+
+从 [whisper.cpp 模型仓库](https://huggingface.co/ggerganov/whisper.cpp/tree/main) 下载多语言 ggml-base.bin（约 142 MiB）。默认存放于 `wx-agent paths` 显示的数据目录下 `models/ggml-base.bin`；也可设置 WHISPER_MODEL 指向模型绝对路径。不要选择英文专用 .en 模型来识别中文。环境变量需在启动桥接的终端中设置。安装后运行 `wx-agent media-check` 检查，运行中的服务需要重启才继承新环境变量。识别完全在本机执行，不需要额外 API Key；模型识别可能有误，重要指令请核对。

@@ -1,6 +1,6 @@
 import {randomBytes} from 'node:crypto';
 
-export const HELP = '直接发文字或截图即可交给当前引擎。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
+export const HELP = '直接发文字、截图、微信语音或 MP4 视频即可交给当前引擎。语音/视频最长 2 分钟，视频最多 50 MB，以抽帧分析画面。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
 
 export class Controller {
   constructor({rpc, cwd, state = {}, save, send, approvalMs = 300000, label = 'Codex'}) {
@@ -36,6 +36,7 @@ export class Controller {
     if (text === '/结果') return this.say(this.state.lastResult || '还没有已完成的任务。');
     if (text.startsWith('/批准 ') || text.startsWith('/拒绝 ') || text.startsWith('/回答 ')) return this.answer(text);
     if (text === '/取消') {
+      if(this.active?.abort) {this.active.abort.abort();return this.say('已请求取消媒体处理，等待清理完成。');}
       if (!this.active?.turnId) return this.say(this.active ? '正在启动任务，请稍后再发送 /取消。' : '当前没有任务。');
       this.clearApprovals(true);
       await this.rpc.request('turn/interrupt', {threadId:this.state.threadId, turnId:this.active.turnId});
@@ -55,16 +56,19 @@ export class Controller {
     this.starting = (async () => {
       let images=[];
       if(prepareImages) {
-        this.active.stage='正在接收图片';
-        await this.say(`已收到图片，正在下载并交给 ${this.label} 分析。`);
-        try {images=await prepareImages();}
+        this.active.stage='正在接收和解析媒体';
+        const abort=new AbortController();this.active.abort=abort;
+        await this.say(`已收到媒体，正在解析并交给 ${this.label} 分析。`);
+        try {images=await prepareImages(abort.signal);if(abort.signal.aborted)throw new Error('已取消媒体处理');}
         catch(e) {
           this.active=null;
-          return this.say(`截图处理失败：${e.message}`);
+          if(!this.closing)return this.say(`媒体处理失败：${e.message}`);
+          return;
         }
       }
+      if(this.active)delete this.active.abort;
       if(this.closing || !this.ready)return;
-      await this.start(text || '请分析这张截图（如有多张，请结合分析），说明主要内容；若有报错，请解释原因和解决办法。',key,images);
+      await this.start(text || '请根据用户提供的媒体内容或语音转写处理请求；如果是视频或截图且未提出问题，请概括内容。转写可能有误，视频画面仅为抽样。',key,images);
     })().catch(async () => {
       // turn/start 超时可能已执行，断开子进程，避免错误地允许第二个任务。
       this.active = null; this.state.active = null; this.ready = false; this.rpc.close();
@@ -159,5 +163,5 @@ export class Controller {
     for (const a of this.approvals.values()) {clearTimeout(a.timer);if (deny) {try {this.deny(a);} catch {}}}
     this.approvals.clear();
   }
-  close() {this.closing = true;this.clearApprovals(true);this.rpc.close();}
+  close() {this.closing = true;this.active?.abort?.abort();this.clearApprovals(true);this.rpc.close();}
 }

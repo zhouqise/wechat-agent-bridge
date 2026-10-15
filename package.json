@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,7 +14,8 @@
     "node": ">=22"
   },
   "dependencies": {
-    "qrcode": "1.5.4"
+    "qrcode": "1.5.4",
+    "silk-wasm": "3.7.1"
   },
   "description": "微信连接本机 Codex / Claude Code：双引擎切换、截图分析、审批与后台管理",
   "bin": {
@@ -36,7 +37,8 @@
     "claude.mjs",
     "engines.mjs",
     "codex-config.mjs",
-    "models.mjs"
+    "models.mjs",
+    "av.mjs"
   ],
   "os": [
     "darwin",

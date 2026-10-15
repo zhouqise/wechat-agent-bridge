@@ -91,7 +91,7 @@ test('截图异步下载期间可查询状态，图片与文字一起传给 Code
   await new Promise(r=>setImmediate(r));
   await c.handle('/状态');
   let downloaded=false;await c.handle('second','image2',async()=>{downloaded=true;return [image];});
-  assert.equal(downloaded,false);assert.ok(messages.some(m=>m.includes('正在接收图片')));
+  assert.equal(downloaded,false);assert.ok(messages.some(m=>m.includes('正在接收和解析媒体')));
   finish([image]);await c.starting;
   assert.deepEqual(rpc.calls.find(x=>x.method==='turn/start').params.input,[{type:'text',text:'解释报错'},image]);
 });
@@ -99,9 +99,9 @@ test('图片失败给予反馈并释放任务，不关闭 Codex 或提交不完�
   const {controller:c,rpc,messages}=await setup();
   await c.handle('','bad',async()=>{throw new Error('图片解密失败，请重新发送截图。');});await c.starting;
   assert.equal(c.active,null);assert.equal(c.ready,true);assert.equal(rpc.calls.length,0);
-  assert.ok(messages.some(m=>m.includes('截图处理失败')));
+  assert.ok(messages.some(m=>m.includes('媒体处理失败')));
   await c.handle('','good',async()=>[{type:'image',url:'data:image/png;base64,test'}]);await c.starting;
-  assert.match(rpc.calls.find(x=>x.method==='turn/start').params.input[0].text,/请分析/);
+  assert.match(rpc.calls.find(x=>x.method==='turn/start').params.input[0].text,/媒体内容或语音转写/);
 });
 test('Claude 标签只影响系统提示，不改写模型结果中的 Codex 文字',async()=>{
   const {controller:c,messages}=await setup({label:'Claude Code'});
@@ -110,4 +110,11 @@ test('Claude 标签只影响系统提示，不改写模型结果中的 Codex 文
   await c.event({method:'item/completed',params:{threadId:'thread1',turnId:'turn1',item:{id:'final',type:'agentMessage',phase:'final_answer',text:'Codex 与 Claude 不同'}}});
   await c.event({method:'turn/completed',params:{threadId:'thread1',turn:{id:'turn1',status:'completed'}}});
   assert.equal(messages.at(-1),'任务完成\nCodex 与 Claude 不同');
+});
+test('媒体处理期间取消会终止准备步骤，不提交模型任务',async()=>{
+ const {controller:c,rpc,messages}=await setup();
+ await c.handle('','voice',signal=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('已取消')),{once:true})));
+ await new Promise(r=>setImmediate(r));
+ await c.handle('/取消');await c.starting;
+ assert.equal(c.active,null);assert.equal(c.ready,true);assert.equal(rpc.calls.length,0);assert.ok(messages.some(m=>m.includes('取消')));
 });

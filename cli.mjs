@@ -8,7 +8,7 @@ import {randomUUID} from 'node:crypto';
 import {BASE, api, trustedBase, acceptBatch} from './bridge.mjs';
 import {engineName,makeController} from './engines.mjs';
 import {modelListText,modelInfo,prepareModel} from './models.mjs';
-import {imageInputs} from './media.mjs';
+import {mediaInputs} from './av.mjs';
 
 const p = paths();
 const dir = p.dir;
@@ -37,7 +37,9 @@ async function save(state) {
 async function clean() {
   if (stopping) return;
   stopping = true;
+  const preparing=controller?.active?.abort?controller.starting:null;
   controller?.close();
+  await preparing;
   await saving;
   await server?.close();
   if (locked) {
@@ -189,11 +191,11 @@ async function main() {
           return;
         }
         const items=msg.item_list ?? [];
-        if(items.some(i=>i.type!==1 && i.type!==2)) {
-          await controller.say('这条消息包含暂不支持的内容，请使用文字或直接发送截图（PNG/JPEG/WebP）；语音、视频和文件暂不处理。');
+        if(items.some(i=>![1,2,3,5].includes(i.type))) {
+          await controller.say('这条消息包含暂不支持的附件，请使用文字、截图、微信语音或 MP4 视频。');
           return;
         }
-        await controller.handle(text,key,items.some(i=>i.type===2)?()=>imageInputs(items):undefined);
+        await controller.handle(text,key,items.some(i=>[2,3,5].includes(i.type))?signal=>mediaInputs(items,{signal}):undefined);
       });
       failures = 0;
       await sleep(1000);
