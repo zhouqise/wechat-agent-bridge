@@ -1,296 +1,190 @@
-# WeChat Agent Bridge · 微信 AI 开发桥接
+<p align="center">
+  <img src="docs/assets/hero.png" alt="WeChat Agent Bridge — 微信连接本机 Codex 与 Claude Code" width="100%" />
+</p>
 
-在个人微信中给本机 Codex 或 Claude Code 发任务，接收结果，并确认需要审批的操作。扫码配置一次，之后在任意目录使用 `wx-agent` 命令。
+<h1 align="center">WeChat Agent Bridge</h1>
 
-独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
+<p align="center"><strong>把电脑上的 AI 编程助手，带进你的微信。</strong></p>
+<p align="center">发任务 · 看结果 · 确认操作<br />连接本机 Codex / Claude Code，让文字、截图、文件和视频进入同一段对话。</p>
 
-从 v0.7.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
+<p align="center">
+  <a href="https://github.com/zhouqise/wechat-agent-bridge/releases/latest"><img src="https://img.shields.io/github/v/release/zhouqise/wechat-agent-bridge?style=flat-square&amp;color=10b981" alt="Latest release" /></a>
+  <a href="https://github.com/zhouqise/wechat-agent-bridge/actions/workflows/test.yml"><img src="https://github.com/zhouqise/wechat-agent-bridge/actions/workflows/test.yml/badge.svg" alt="Cross-platform tests" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0f766e?style=flat-square" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/Node.js-22%2B-334155?style=flat-square" alt="Node.js 22+" />
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-334155?style=flat-square" alt="macOS, Windows and Linux" />
+</p>
 
-## 安装
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#你可以用它做什么">功能概览</a> ·
+  <a href="#多人共享一台电脑">多用户并行</a> ·
+  <a href="docs/setup.md">完整文档</a> ·
+  <a href="https://github.com/zhouqise/wechat-agent-bridge/releases/latest">下载</a> ·
+  <a href="CHANGELOG.md">更新记录</a>
+</p>
 
-需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
+---
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.13.1：
+## 从一条微信，开始一项任务
 
-```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
-wx-agent setup
-wx-agent start
+电脑上运行你的 Codex 或 Claude Code，微信负责发起任务、接收结果和确认操作。扫码绑定后，就能在私聊中继续处理项目、分析资料，或查看执行进度。
+
+```text
+你 → “检查这个项目的测试失败原因，先说明修复方案。”
+你 → 发一张报错截图：“这个问题怎么解决？”
+你 → 发一份 PDF：“按页总结重点，列出需要确认的信息。”
+你 → “总结这个网页：https://example.com/article”
 ```
 
-也可以下载源码，解压后进入源码目录执行 `npm install -g . --ignore-scripts`。源码安装可能链接到该目录，请保留源码；推荐普通用户使用 tgz 安装包。尚未发布到 npm，不能直接用包名从 npm 安装。
+以上为使用示例。需要权限确认的操作会返回审批请求，结果回到发起任务的微信会话。
 
-macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
+## 你可以用它做什么
 
-```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-将这条 PATH 配置加入自己的 shell 配置后，新终端也能找到命令。安装依赖需要能访问 npm；安装包本身不包含 Node.js 或 Codex。
-
-## 首次配置
-
-在电脑终端运行 `wx-agent setup`，依次选择引擎、认证方式（Claude）、工作目录和代理，然后用手机微信扫描终端中的二维码。如要求配对码，在电脑终端输入。
-
-工作目录可以直接回车，使用独立空白工作区。只有需要操作实际项目时才填写该项目的完整路径；每条微信消息无需指定目录。代理需要填写完整地址，例如 `http://127.0.0.1:7890`；无代理直接回车。输入 `direct` 可以清除旧代理。代理只传给所选引擎的子进程及相应连接检查。
-
-配置向导检查所选 CLI 和认证配置，Codex 额外检查网络可达性，不会发起模型任务。微信绑定完成后执行 `wx-agent start`。首次可向机器人发送“不要调用工具，只回复：微信 Codex 已连通”验证完整链路。
-
-## 日常使用
-
-以下命令可以在任意目录执行：
-
-```sh
-wx-agent start       # 后台启动，可关闭终端
-wx-agent status      # 查看连接、工作目录和任务状态
-wx-agent stop        # 停止桥接，终止当前引擎子进程
-wx-agent restart     # 重启
-wx-agent logs        # 最近日志
-wx-agent logs --follow
-wx-agent doctor     # 检查 CLI 登录和网络
-wx-agent paths      # 查看数据保存位置
-```
-
-`wx-agent engine` 查看默认引擎；`wx-agent engine claude` 或 `wx-agent engine codex` 切换，若后台运行会重启。切换前请等待任务完成。
-
-`wx-agent run` 为前台运行模式，Ctrl+C 停止。后台运行不等于开机自启：重启电脑后需执行 `wx-agent start`；电脑须保持唤醒和联网。进程异常退出不会自动重启。停止前建议在微信取消或等待当前任务完成。
-
-| 微信消息 | 功能 |
+| 能力 | 使用方式 |
 | --- | --- |
-| 普通文字 | 开始任务，延续当前上下文 |
-| `/帮助` | 命令说明 |
-| `/引擎` | 查看当前引擎 |
-| `/引擎 codex` / `/引擎 claude` | 空闲时切换引擎，分别保留会话 |
-| `/状态` | 查看任务及工作目录 |
-| `/取消` | 请求中断当前任务 |
-| `/新会话` | 空闲时新建上下文，保留文件 |
-| `/结果` | 获取最近任务结果 |
-| `/批准 编号` | 单次批准操作 |
-| `/拒绝 编号` | 拒绝操作 |
-| `/回答 编号 内容` | 回答非敏感问题 |
+| **双引擎与模型切换** | 在微信切换 Codex / Claude Code，分别保留上下文；支持本机登录和 API Key 配置。 |
+| **截图分析** | 直接发送截图，结合报错、界面和文字继续追问。 |
+| **视频画面 + 音轨分析** | 抽帧、分段离线转写，再交给模型结合分析；支持最长 30 分钟、200 MB 的 MP4。 |
+| **文档与数据处理** | 读取 PDF、Excel、Word、PPT 和常用文本附件；生成结果后通过微信取回文件。 |
+| **网页链接分析** | 提取公开网页的静态正文，支持总结、比较和来源标注。 |
+| **多用户并行** | 分别扫码绑定，独立工作区、会话和审批，多个用户可以同时执行任务。 |
+| **任务控制与审批** | 查看状态、取消任务、恢复上下文，并对需要确认的操作作单次审批。 |
+| **后台运行与升级** | 关闭终端后继续运行，使用 `wx-agent update` 检查并安装最新稳定版。 |
 
-同一时间只执行一个任务，忙碌时新任务不排队。当前处理绑定用户的私聊文字、图片、微信语音和 MP4 视频，不处理群聊；Office 附件支持见下方说明；不接管 Codex 桌面应用已有聊天。回复最多显示 16000 字，完整最近结果保存在本机状态中。
+## 快速开始
 
-## 工作区、升级与恢复
+准备 **Node.js 22+、npm、系统 curl**，以及至少一种已安装并配置认证的引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。
 
-更换项目：先 `wx-agent stop`，再 `wx-agent setup` 选择新目录，最后 `wx-agent start`。目录变更会清空桥接使用的旧会话引用，工作文件不删除。普通重启会保留上下文，但不会自动重跑中断的任务。
+### 1. 安装
 
-升级（v0.13.1 起）：在任意目录执行 `wx-agent update`，检查版本可用 `wx-agent update --check`。自动从本仓库最新稳定 Release 下载并校验 SHA-256，使用当前全局安装位置更新。任务忙碌时拒绝升级；运行中的空闲服务升级后重启，已停止的服务保持停止。安装失败时提示手动修复，不声称已回滚。仅支持全局 tgz 安装，源码安装先手动安装 tgz。Windows 自动通过 Node 启动 npm，无需另写 npm.cmd。
+macOS / Linux：
 
-升级下载优先使用 `WX_AGENT_UPDATE_PROXY`，其次 `HTTPS_PROXY`，再使用当前引擎保存的代理。设置 `WX_AGENT_UPDATE_PROXY=direct` 可强制直连。代理下载需要系统 curl（Windows 为 curl.exe）；不接受带账号密码的代理 URL。
-
-旧版本首次升级：停止后安装新的 tgz，再启动，此后即可使用 `wx-agent update`。配置与凭据独立于安装目录，不受包更新影响。旧版 0.2 用户需停止旧进程，在旧源码目录运行 `node wx-agent.mjs migrate`，导入绑定、代理和会话；旧工作区和旧状态文件保留。安装包中不包含任何人的配置或凭据。
-
-微信登录过期：`wx-agent stop` → `wx-agent login --force` → `wx-agent start`。强制登录会将旧会话保存为 `session.json.backup`，重新扫码会建立新绑定及新上下文。
-
-默认数据目录：
-
-- macOS：`~/Library/Application Support/wx-codex`
-- Linux：`${XDG_DATA_HOME:-~/.local/share}/wx-codex`
-- Windows：`%LOCALAPPDATA%\wx-codex`（通常为 `C:\Users\你的用户名\AppData\Local\wx-codex`）
-
-可用 `WX_CODEX_HOME` 指定短的绝对路径，所有管理命令须使用同一设置。`BRIDGE_STATE_DIR` 是兼容旧环境变量的别名。macOS/Linux 的 Unix 管理套接字路径不得超过 100 字节；Windows 使用命名管道，不受此限制。`BRIDGE_CODEX_PROXY`、`BRIDGE_CLAUDE_PROXY` 分别覆盖两种引擎的代理。
-
-`status --json` 提供机器可读状态。“本机适配器已就绪”不等于远端模型一定可用；“最近成功轮询”用于判断微信连接是否更新。`doctor` 的 HTTP 检测可能受防火墙影响，不代替实际任务验证。
-
-卸载：先停止，再 `npm uninstall -g wx-codex-bridge`（自定义 prefix 安装须带相同 prefix）。用户数据会保留，可根据 `wx-agent paths` 先记下位置再自行清理。不要把数据目录作为公开仓库上传。
-
-## 开发和验证
-
-```sh
-npm ci --ignore-scripts
-npm test
-npm pack
-```
-
-打包使用明确的发布文件清单，排除凭据、工作区、日志和本地配置。源码发布也应使用经过检查的干净源码包，不能直接上传正在运行的整个文件夹。
-
-测试覆盖来源校验、去重、上下文恢复、任务并发、取消、审批、RPC、锁和本机管理接口。详见 [安全说明](SECURITY.md)。
-
-协议依据：[腾讯微信协议](https://github.com/Tencent/openclaw-weixin/blob/main/docs/protocol_zh_CN.md)（参考 2.4.10）及 [Codex App Server](https://learn.chatgpt.com/docs/app-server)。上游接口变化可能需要适配。
-
-## 截图
-
-直接在微信发送截图即可，默认分析截图内容和报错。也可以先发截图，等分析完成后继续问“这个错误怎么修复”；上下文会保留。若同一条消息携带文字和图片，会一起传给 Codex。不同消息不会自动合并，任务执行中收到新任务会提示稍后重发。
-
-支持 PNG、JPEG、WebP；每条最多 4 张，每张下载大小不超过 10 MiB（含加密填充），总解密大小不超过 20 MiB。请用微信图片方式发送，文件附件和引用旧图片暂不支持。收到图片会有接收提示，下载、解密或格式失败会明确回复。图片下载使用微信官方 CDN，不使用 Codex 代理，不自动重试失败的任务。
-
-桥接将图片在内存中解密，通过图像输入交给当前引擎；不把 CDN 密钥或链接传给模型，也不在工作区保存截图文件。图片会提交给当前引擎的模型，并可能保存在对应 CLI 的会话记录中。需使用支持图像输入的模型。
-
-## 开源许可
-
-采用 [MIT 许可证](LICENSE)。欢迎通过 [Issues](https://github.com/zhouqise/wechat-agent-bridge/issues) 报告问题，请勿附带登录凭据、二维码或原始会话文件。`package.json` 中的 `private: true` 用于防止误发布到 npm，不影响 GitHub 开源或安装 Release 包。
-
-## Windows 安装（PowerShell）
-
-安装 Node.js 22 或以上版本，重新打开普通用户 PowerShell，执行：
-
-```powershell
-npm.cmd install -g @openai/codex
-codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
-wx-agent.cmd setup
-wx-agent.cmd start
-wx-agent.cmd status
-```
-
-显式使用 `.cmd` 可避免 PowerShell 的脚本执行策略阻止 npm 生成的 `.ps1` 文件，无需修改系统执行策略。停止、重启、日志分别是 `wx-agent.cmd stop`、`wx-agent.cmd restart`、`wx-agent.cmd logs`。后台启动后可以关闭终端，注销或重启 Windows 后需要再次启动；暂不注册 Windows 服务或开机计划任务。
-
-配置向导中工作区填写完整路径，例如 `D:\Projects\demo`，路径包含空格和中文也可使用。请填写原始路径，不要在输入值外额外加引号。建议保留默认用户数据目录，不要把凭据目录放在共享盘中。Windows 使用用户目录继承的 NTFS 权限；POSIX 的 0700/0600 不能代替 Windows ACL。
-
-默认支持 npm 官方全局安装的 Codex，也可通过 `$env:CODEX_BINARY = 'C:\Tools\codex.exe'` 指定原生可执行文件，或指定 npm 包的 `bin\codex.js`。自定义环境变量需在各管理终端保持一致。桥接不会把微信文字拼入 cmd.exe 命令。
-
-若命令找不到，重新打开终端并检查 `npm.cmd config get prefix` 对应目录是否在 PATH。网络检查使用 Windows 自带的 `curl.exe`；代理地址仍需填写完整 URL。桥接以当前 Windows 用户权限运行，不需要以管理员身份安装或启动。
-
-## Claude：本机登录与 API Key
-
-桥接直接调用用户自行安装的 Claude Code CLI，不提供第三方登录服务，不读取或复制登录令牌。两种认证方式都支持：
-
-- `local`：由 Claude Code 自己加载用户级配置和已有认证。先在电脑运行 `claude auth login`，然后 `wx-agent setup` 选择 `claude` → `local`。
-- `api`：只读取启动进程环境中的 `ANTHROPIC_API_KEY`，不加载 Claude 用户级设置，也不回退到本机登录。先设置环境变量，再 `wx-agent setup` 选择 `claude` → `api`。API 使用独立额度/计费，密钥不写入桥接配置或微信状态。
-
-macOS/Linux 可通过隐藏输入设置本次终端的 API Key：
-
-```sh
-read -r -s ANTHROPIC_API_KEY
-export ANTHROPIC_API_KEY
-wx-agent setup
-wx-agent start
-```
-
-Windows PowerShell 可用：
-
-```powershell
-$env:ANTHROPIC_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'API Key' -AsSecureString)).Password
-wx-agent.cmd setup
-wx-agent.cmd start
-```
-
-不要把真实密钥贴进微信、issue 或聊天。环境变量仅随当前终端及子进程生效；从另一个终端重启 API 模式时需要重新提供。`ANTHROPIC_BASE_URL` 等环境配置由 Claude Code 本身处理；桥接不会替你把凭据复制到其他服务。
-
-使用 `wx-agent doctor --engine claude` 检查本机 CLI/认证配置；该检查不提交模型请求，不能证明 API Key 有效。`CLAUDE_BINARY` 可指定 Claude 原生程序或 npm 的 `cli.js`。Windows 下兼容 `claude.exe`、新版 npm 包的 `bin/claude.exe` 及旧版 `claude.cmd` 启动器；安装 Claude 本身不要使用 `--ignore-scripts`，它需要官方 postinstall 安装原生程序（桥接包安装仍可使用 `--ignore-scripts`）；安装和认证可按官方安装文档操作，npm 用户可执行 `npm.cmd install -g @anthropic-ai/claude-code`、`claude.cmd auth login`。
-
-微信发送 `/引擎 claude` 即可使用 Claude，`/引擎 codex` 切回。切换只允许在任务空闲时进行；切换失败会保留原引擎。两个引擎分别保存会话和最近结果，`/新会话` 只重置当前引擎。任务不会自动同时发给两个引擎。
-
-Claude 当前开放 Read、Glob、Grep、Bash、Edit、Write 六种工具，调用前均须微信单次确认。文件工具拒绝配置工作区外的路径；Bash 获批后以当前用户权限执行，不等同于 Codex 的 workspace-write 操作系统沙箱。hooks、外部 MCP、技能入口及 Chrome 集成关闭，其他交互默认拒绝。需要完整展示工具参数，详情过长会拒绝执行。
-
-本机认证已验证文字、图像输入、会话恢复与 Read 审批；API Key 模式已验证配置及协议，未使用真实 API Key 做计费请求。微信手机端的引擎切换完整链路仍待用户验证。CLI 流式控制协议可能随上游版本改变，发生不兼容时请提交脱敏的问题描述。
-
-## Codex API Key 与自定义接口
-
-`wx-agent setup` 选择 `codex` → `api`，依次配置 API 基础地址（例如 `https://api.openai.com/v1`）、服务商提供的模型 ID、密钥环境变量名称（默认 `OPENAI_API_KEY`）。先在自己的终端设置该环境变量，再运行 setup/start；密钥不填写在向导中，不写入桥接配置。
-
-macOS/Linux 示例：
-
-```sh
-export OPENAI_API_KEY='你的密钥'
-export OPENAI_BASE_URL='https://api.openai.com/v1'
-export OPENAI_MODEL='服务商提供的模型ID'
-wx-agent setup
-wx-agent start
+```bash
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
 ```
 
 Windows PowerShell：
 
 ```powershell
-$env:OPENAI_API_KEY='你的密钥'
-$env:OPENAI_BASE_URL='https://api.openai.com/v1'
-$env:OPENAI_MODEL='服务商提供的模型ID'
-wx-agent.cmd setup
-wx-agent.cmd start
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
 ```
 
-地址与模型以 setup 保存值优先，未配置时读取上述环境变量；密钥始终从指定环境变量读取。每次从新终端启动、重启或切换至 API 引擎时，需确保该终端已设置密钥。运行中的后台进程不会随终端后续环境变量修改而更新。
+安装包通过 GitHub Releases 提供，尚未发布到 npm。没有全局目录写入权限时，参见[用户目录安装](docs/setup.md#安装)。
 
-接口须兼容 Responses API，不能直接使用仅兼容 Chat Completions 或 Anthropic Messages 的接口。HTTPS 为默认要求，本机回环地址允许 HTTP。`wx-agent doctor --engine codex` 在 API 模式只检查配置和本机 app-server 初始化，不验证密钥有效性、余额或远端模型兼容性，也不发起付费推理。
-
-选择 `local` 可继续沿用 Codex 自己的登录和配置。API 模式通过子进程参数指定独立 provider，不修改全局 Codex 配置，不将密钥放入命令参数，也不回退 ChatGPT 登录。修改认证方式、地址或模型后会重置桥接的 Codex 会话引用，原工作文件保留。配置字段依据 [Codex 官方配置参考](https://developers.openai.com/codex/config-reference/)。
-
-## 切换模型
-
-微信发送 `/模型` 查看当前引擎的模型设置，发送 `/模型 模型名` 切换。终端使用 `wx-agent model` 查看、`wx-agent model 模型名` 切换；Windows PowerShell 使用 `wx-agent.cmd`。例如 Claude 引擎可使用 `/模型 sonnet`；Codex 请填写账号或服务商支持的模型 ID。
-
-两个引擎分别保存模型设置，切换引擎不会覆盖另一侧的模型。运行中无需重启，新模型从下一条任务生效，保留会话上下文；停止时在终端修改则下次启动生效。任务执行中（包括审批、图片下载）禁止切换。尚未指定模型时显示“沿用引擎默认模型”，不猜测实际模型名称。
-
-切换只保存模型选择，不提前发起推理或验证账号额度；若服务商拒绝模型，请改回可用模型后重试。模型切换不会改变引擎、认证方式或 API 地址。
-
-`/模型` 和 `wx-agent model` 现在同时显示模型列表：Codex 本机模式从 app-server 获取目录；Claude 通过独立 CLI 初始化读取模型目录（不提交推理任务），查询失败时才显示备用别名。Codex API 模式提示到服务商控制台确认，不将官方目录误作第三方服务商可用模型。目录获取失败时保留当前设置，仍可输入已知 ID。
-
-## 语音和视频
-
-语音只使用微信消息附带的转文字，交给当前引擎处理。如果微信未附带转写，会提示先在微信转成文字，再重新发送文字内容；不会下载语音或调用识别服务。
-
-直接发送 MP4 视频可分析画面：每条最多一个视频，最长 30 分钟、最大 200 MB。按时长均匀抽取 6–30 帧并附时间标记，同时将首条音轨按 2 分钟分段离线转写为带时间范围的文字，交给模型结合分析。抽样不能覆盖全部动作或细节，转写可能有错漏；不识别人声身份或非语音音效。两种引擎均以文字回复。
-
-视频需要 FFmpeg（包含 ffprobe）。macOS 可运行 `brew install ffmpeg`；Windows/Linux 按 [FFmpeg 官方说明](https://ffmpeg.org/download.html) 安装并加入 PATH，也可通过 FFMPEG_BINARY、FFPROBE_BINARY 指定绝对路径（Windows 使用 .exe）。随后运行 `wx-agent media-check`；修改环境变量后重启桥接。
-
-处理期间可以 `/状态`、`/取消`。临时视频和帧文件在完成、失败或正常停止后删除；微信转写文字和视频抽样画面交给所选模型服务，可能保存在该引擎会话记录中。微信语音不需要识别模型；视频音轨离线识别需要下述组件，无需额外 API Key。
-
-Claude 的 `/模型` 现在从 CLI 初始化响应读取真实模型目录，支持 `sonnet[1m]` 等带上下文后缀的名称。列表仍由 CLI/服务配置决定，不保证账号额度。显示的“最近任务实际模型”来自最近一次任务的 system/init 事件；尚无任务或刚切换模型时明确显示未确认，不将别名猜测为实际模型。目录查询不会发送用户任务，不修改已有会话，独立查询进程在完成或超时后退出。
-
-## Excel、Word、PPT
-
-支持直接发送 `.pdf`、`.xlsx`、`.docx`、`.pptx`，以及 `.txt`、`.md`、`.csv`、`.tsv`、`.json`、`.log`、`.yaml`、`.yml`、`.xml` 文件（每条一份、最大 20 MB）。收到后提取文字、表格、单元格和公式供当前引擎阅读；你可以再发送“汇总销售额”“修改这份文档”“调整第三页文案”等任务。Codex 和 Claude 都可以使用独立 Python 环境中的 openpyxl、python-docx、python-pptx、pypdf 编辑或生成文件，工具执行仍遵守原审批规则。
-
-首次使用需安装 Python 3（建议 3.10+），然后在本机执行：
-
-```sh
-wx-agent office-setup
-wx-agent office-check
-```
-
-Windows 使用 `wx-agent.cmd`，Python 须加入 PATH。安装命令创建用户数据目录中的独立环境，不修改系统 Python 包；需要网络下载依赖。可用 PYTHON_BINARY 指定创建环境的 Python，可用 WX_OFFICE_PYTHON 指定已有且包含上述库的 Python（office-setup 会在指定环境安装依赖）。
-
-输入原件与提取文字保存在当前工作区的 `wx-agent-input` 下，每次创建独立目录；结果另存到 `wx-agent-output`。这些文件会保留，用户可按需清理。微信发送 `/文件` 查看结果，发送 `/文件 文件名.xlsx`（或 PDF/Office/上述文本格式）回传文件；仅允许输出目录中的受支持普通附件文件，不允许目录穿越、符号链接、硬链接或大于 20 MB 的结果。未确认发送成功时不会自动重发。
-
-暂不支持旧版 `.xls/.doc/.ppt`、宏文件、加密文档、PDF 或其他附件；请先转换为上述格式。解析还限制解压总量 80 MB、条目数 5000、单条目 16 MB，以避免异常压缩文件。大文档只提取部分内容，模型需要时可读取原文件。
-
-提取内容不等于可视化预览：图表、嵌入图片、复杂版式不保证完整识别；Excel 公式由库保留/编辑，但不会像 Excel 那样重新计算。修改后的复杂样式或特殊对象需要用户在 Office 中复核。桥接不自动执行宏，不跟随外部链接；模型处理文件仍需遵循审批。文件内容和提取文字会提交给选中的模型服务。
-
-### 视频音轨离线转写
-
-视频音轨使用 whisper.cpp 在本机识别。macOS 安装 `brew install whisper-cpp`；Windows/Linux 按 [whisper.cpp 官方说明](https://github.com/ggml-org/whisper.cpp) 安装 `whisper-cli`。从 [官方模型仓库](https://huggingface.co/ggerganov/whisper.cpp/tree/main) 下载多语言 `ggml-base.bin`（约 142 MiB），放到 `wx-agent paths` 数据目录下的 `models/ggml-base.bin`，或设置 `WHISPER_MODEL` 为绝对路径。`WHISPER_BINARY` 可指定可执行文件路径；Windows 使用 .exe。
-
-运行 `wx-agent media-check` 检查 FFmpeg、FFprobe、Whisper 和模型，再重启桥接。视频解析不上传原始音轨给转写服务，但抽帧与转写文字会交给当前 Codex/Claude 模型。临时音频和字幕在完成或失败后清理；处理过程中可 `/状态` 查看抽帧或转写段数，或 `/取消`。视频下载超时为 5 分钟，每段转写超时为 10 分钟；长视频可能耗时较久。累计字幕上限 12 万字符，超限或失败的段落会明确标记缺失，其余段落继续处理。没有音轨时只看画面；组件缺失、超时或转写失败时明确说明本次只分析画面，不假装已听懂。微信语音消息保持原规则：只用微信附带文字，没有文字就提示重发文字。
-
-
-## 网页链接分析
-
-在微信发送 `总结这个网页：https://example.com/article`，或一次给出最多 3 个链接进行比较。桥接读取静态网页正文并交给当前 Codex / Claude，回答标注来源。直接发送链接时默认概括内容。
-
-支持公网 HTTP/HTTPS 的 HTML、纯文本、Markdown；每页最大 2 MB，提取最多 20000 字符，最多 5 次重定向。可 `/状态` 查看读取进度，`/取消` 中止。网页资料仅用于分析，不作为可执行指令。不会携带微信凭据、浏览器 Cookie 或登录状态，不读取本机及内网地址。网页读取使用直连，不复用引擎代理，以便校验并固定公网连接地址。
-
-需要登录、验证码、JavaScript 渲染的页面（部分公众号和动态网站）可能只能提取部分内容或读取失败；失败时明确说明，可改发正文或截图。PDF、视频等下载链接不在网页解析范围内。
-
-
-## 多用户同时运行
-
-原来的微信绑定为 `default`，现有命令继续管理默认用户。新增用户使用独立后台进程、微信扫码绑定、会话、日志、审批和工作目录，可以与默认用户同时执行任务。每个用户自身仍一次执行一个任务。
+### 2. 配置并启动
 
 ```bash
-wx-agent user add girlfriend       # 创建独立目录，让她扫码，成功后自动启动
-wx-agent user list                 # 所有用户的绑定及运行状态
-wx-agent user status girlfriend
-wx-agent user stop girlfriend
-wx-agent user start girlfriend
-wx-agent user logs girlfriend
-wx-agent --user girlfriend model   # 查看她的模型设置
+wx-agent setup
+wx-agent start
 ```
 
-暂时无法扫码时使用 `wx-agent user add girlfriend --no-login`，之后 `wx-agent user login girlfriend` 完成扫码并自动启动。不要让新增用户扫描默认账号的 `login --force` 二维码。再次 add 不会覆盖已有用户。
+按提示选择引擎、认证方式、工作目录和代理，再用自己的微信扫码。工作目录可直接回车使用独立空白工作区，无需每条消息都指定目录。Windows PowerShell 可使用 `wx-agent.cmd`。
 
-新增用户复制默认用户的引擎、模型、认证方式和代理配置，共用本机 Codex/Claude 登录与 API Key 环境变量、Office Python 环境及 Whisper 模型；后续切换引擎和模型互不影响。并发使用共用账号额度和机器资源，不保证服务商不发生限流。每个用户只接收自己的审批和结果，不存在全局任务队列。
+### 3. 发起第一次对话
 
-这是应用层的工作区和会话分离，不是操作系统安全隔离；批准执行命令仍可能访问本机用户权限范围内的其他文件。不要将它作为不可信用户的隔离沙箱。
+在微信中向已绑定的机器人发送：
 
-移除时先 `wx-agent user stop girlfriend`，再 `wx-agent user remove girlfriend`。绑定和文件移入数据目录的 `removed-users`，不删除工作文件；已停止用户不会继续接收消息。升级安装包前需停止所有新增用户，升级后分别启动；`wx-agent update` 发现新增用户仍在运行会拒绝升级，不会打断她的任务。
+> 不要调用工具，只回复：微信 AI 助手已连通。
 
+收到回复后，就可以发送任务、截图或文件。安装及网络问题参见[完整配置指南](docs/setup.md)。
 
-### PDF 与文本附件
+## 按需开启媒体与文档能力
 
-PDF 提取文字层并标注原页码，最多前 200 页、30000 字符；达到限制会明确提示截断。扫描版、图片、图表和排版尚不进行 OCR 或渲染识别；没有提取到文字的页会明确标记，不能当作已读懂。加密或损坏 PDF 会拒绝解析，请先提供未加密版本。可让模型按页总结、提取信息，或使用 pypdf 合并、拆分等；具体文件操作仍遵循审批。
+基础文字任务不需要安装下面的可选组件。
 
-文本文件支持 UTF-8、带 BOM 的 UTF-16 和 GB18030 解码，最多提取 30000 字符，不执行文本中的代码。TXT/Markdown/CSV/JSON 等仅按文本读取，不保证已验证结构或格式。原文件保留在独立用户工作区，处理结果可通过 `/文件 文件名.pdf` 或 `/文件 result.md` 等命令取回。
+| 输入 | 当前范围 | 额外准备 |
+| --- | --- | --- |
+| 截图 | PNG / JPEG / WebP；每条最多 4 张 | 使用支持图像输入的模型 |
+| PDF / Office | 每条 1 份、最大 20 MB；PDF 提取文字层及页码 | Python 3，运行 `wx-agent office-setup` |
+| 文本附件 | TXT / MD / CSV / TSV / JSON / LOG / YAML / YML / XML | 无需 Python |
+| MP4 视频 | 最长 30 分钟、200 MB；6–30 帧，按 2 分钟分段转写 | FFmpeg、whisper.cpp、转写模型 |
+| 网页链接 | 每条最多 3 个；读取公开静态正文 | 网页需能从本机直连访问 |
+| 微信语音 | 使用微信消息附带的转文字 | 无转文字时需重发文字 |
 
-旧版本升级后，PDF/Office 用户请再运行一次 `wx-agent office-setup` 安装 pypdf，再用 `wx-agent office-check` 验证。文本附件不依赖 Python。
+```bash
+wx-agent office-setup   # 安装 PDF / Office 处理环境
+wx-agent office-check  # 检查文档组件
+wx-agent media-check   # 检查视频组件和转写模型
+```
+
+**能力边界：**扫描版 PDF 暂不做 OCR；登录或 JavaScript 动态网页可能无法完整读取；视频画面为抽样，转写可能有错漏。更多格式、限制和组件安装方法见[媒体与文件指南](docs/media.md)。
+
+## 常用命令，一眼找到
+
+### 在微信里
+
+| 命令 | 功能 |
+| --- | --- |
+| `/引擎`、`/引擎 claude`、`/引擎 codex` | 查看或切换引擎 |
+| `/模型`、`/模型 模型名` | 查看目录或切换模型 |
+| `/状态`、`/取消` | 查看进度或中断当前任务 |
+| `/新会话`、`/结果` | 开启新上下文或获取最近结果 |
+| `/批准 编号`、`/拒绝 编号` | 处理本次操作审批 |
+| `/文件`、`/文件 result.pdf` | 查看和取回生成文件 |
+| `/帮助` | 查看完整命令说明 |
+
+### 在电脑上
+
+```bash
+wx-agent status         # 查看当前服务状态
+wx-agent stop           # 停止默认用户的桥接
+wx-agent start          # 后台启动默认用户
+wx-agent logs           # 查看最近日志
+wx-agent update --check # 只检查新版本
+wx-agent update         # 升级到最新稳定版
+```
+
+升级保留配置与绑定。任务执行中会拒绝升级；多用户使用时，先停止新增用户，升级后分别启动。服务管理、重新绑定和工作区迁移见[运维指南](docs/operations.md)。
+
+## 多人共享一台电脑
+
+让家人或协作者使用电脑上已安装的引擎，每个人使用自己的微信入口：
+
+```bash
+wx-agent user add teammate     # 创建工作区，扫码后自动启动
+wx-agent user list             # 查看所有用户
+wx-agent user status teammate  # 查看指定用户状态
+wx-agent user stop teammate    # 只停止指定用户
+```
+
+**不同用户可并行，每个用户一次处理一个任务。**会话、工作目录、审批和结果分别管理；引擎登录、账号额度和机器资源共用。原有账号保留为 `default`，原命令继续管理默认用户。
+
+工作区分离不等于操作系统安全隔离，获批命令仍以本机用户权限执行。添加、重新绑定、停用与归档见[多用户文档](docs/operations.md#多用户同时运行)。
+
+## 它如何工作
+
+```mermaid
+flowchart LR
+    W[微信私聊] <--> B[本机 Bridge]
+    B <--> C[Codex CLI]
+    B <--> A[Claude Code]
+    C --> P[当前用户工作区]
+    A --> P
+```
+
+每个用户运行独立 Bridge 进程，连接该用户当前选择的引擎。桥接保留会话引用和任务状态，不接管 Codex 桌面应用已有聊天。原始资料或提取内容会提交给所选模型服务；本机运行桥接不代表模型推理离线。
+
+## 文档导航
+
+| 文档 | 内容 |
+| --- | --- |
+| [安装与首次配置](docs/setup.md) | 三平台安装、扫码、工作目录与代理 |
+| [引擎、认证与模型](docs/engines.md) | 本机登录、API Key、自定义接口与模型切换 |
+| [媒体与文件](docs/media.md) | 截图、音视频、网页、PDF、Office 和文本附件 |
+| [运维与多用户](docs/operations.md) | 启停、升级、重新绑定、恢复、独立用户 |
+| [开发与贡献](docs/development.md) | 本地验证、打包、协议参考与反馈方式 |
+| [安全说明](SECURITY.md) · [更新记录](CHANGELOG.md) | 权限边界及版本变化 |
+
+## 使用前了解
+
+- 电脑需保持唤醒和联网；后台运行不等于开机自启，重启电脑后需再次启动。
+- 支持绑定用户的私聊，不支持群聊。账号能否扫码绑定取决于微信服务端。
+- macOS 已有真实连接验证；Windows/Linux 有跨平台自动测试，完整微信与模型链路仍需实机确认。
+- 独立开源项目，非腾讯、OpenAI 或 Anthropic 官方产品。请保管好凭据，不要在 Issues 中上传二维码、密钥或会话文件。
+
+## 开源与反馈
+
+采用 [MIT 许可证](LICENSE)。欢迎提交 [Issue](https://github.com/zhouqise/wechat-agent-bridge/issues) 或 Pull Request，说明平台、版本、复现步骤和脱敏日志。
+
+<p align="center"><sub>WeChat Agent Bridge · Your coding agents. One conversation away.</sub></p>
