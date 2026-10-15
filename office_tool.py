@@ -1,10 +1,34 @@
 """Validate and extract Office content. Never executes macros or external links."""
 import json, sys, zipfile, pathlib
 
+def inspect_pdf(p):
+    from pypdf import PdfReader, filters
+    # Bound decoded content streams before text extraction.
+    for name in ('ZLIB_MAX_OUTPUT_LENGTH','LZW_MAX_OUTPUT_LENGTH','RUN_LENGTH_MAX_OUTPUT_LENGTH','MAX_ARRAY_BASED_STREAM_OUTPUT_LENGTH','MAX_DECLARED_STREAM_LENGTH'):
+        setattr(filters,name,8*1024*1024)
+    if p.open('rb').read(5)!=b'%PDF-': raise ValueError('pdf signature')
+    reader=PdfReader(p,strict=True)
+    if reader.is_encrypted: raise ValueError('encrypted PDF')
+    total=len(reader.pages); parts=[]; used=0; truncated=total>200; empty=[]
+    for i in range(min(total,200)):
+        text=reader.pages[i].extract_text() or ''
+        if not text.strip():
+            empty.append(i+1)
+            text='[此页未提取到文字，可能是扫描图片或空白页；未进行 OCR，不得推断内容。]'
+        part='第 %d 页\n%s'%(i+1,text)
+        remaining=30000-used
+        if len(part)>remaining:
+            parts.append(part[:remaining]);truncated=True;break
+        parts.append(part);used+=len(part)+2
+        if used>=30000:truncated=i+1<total;break
+    return {'format':'.pdf','text':'\n\n'.join(parts)[:30000],'truncated':truncated,'pages':total,'emptyPages':empty,
+            'notice':'PDF 共 %d 页，最多提取前 200 页、30000 字符，按原页码标记。只读取文字层，未进行 OCR 或渲染图片、图表和版式；无文字的页面不能据此分析内容。'%total}
+
 def inspect(filename):
     p=pathlib.Path(filename); ext=p.suffix.lower()
-    if ext not in ('.xlsx','.docx','.pptx'): raise ValueError('format')
     if p.stat().st_size>20*1024*1024: raise ValueError('size')
+    if ext=='.pdf': return inspect_pdf(p)
+    if ext not in ('.xlsx','.docx','.pptx'): raise ValueError('format')
     with zipfile.ZipFile(p) as z:
         entries=z.infolist()
         if len(entries)>5000 or sum(i.file_size for i in entries)>80*1024*1024: raise ValueError('size')

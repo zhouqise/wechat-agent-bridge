@@ -8,7 +8,7 @@ import {randomUUID} from 'node:crypto';
 import {BASE, api, trustedBase, acceptBatch} from './bridge.mjs';
 import {engineName,makeController} from './engines.mjs';
 import {modelListText,modelInfo,prepareModel} from './models.mjs';
-import {officeInputs,workspaceDir,OFFICE_EXTS} from './office.mjs';
+import {officeInputs,workspaceDir,FILE_EXTS} from './office.mjs';
 import {sendOfficeFile} from './file-send.mjs';
 import {webInputs} from './web.mjs';
 import {mediaInputs} from './av.mjs';
@@ -201,16 +201,16 @@ async function main() {
           if(controller.active){await controller.say('任务执行中，请完成后再取回文件。');return;}
           if(text==='/文件') {
             const dir=await workspaceDir(cwd,'wx-agent-output');
-            const names=(await fs.readdir(dir)).filter(n=>OFFICE_EXTS.includes(path.extname(n).toLowerCase())).slice(0,50);
+            const names=(await fs.readdir(dir)).filter(n=>FILE_EXTS.includes(path.extname(n).toLowerCase())).slice(0,50);
             await controller.say(names.length?'可取回的文件：\n'+names.map(n=>'/文件 '+n).join('\n'):'还没有输出文件。请先让模型把处理结果保存到 wx-agent-output。');return;
           }
           try {await sendOfficeFile({cwd,name:text.slice(4).trim(),state,contextToken});}
-          catch {await controller.say('文件发送未确认或文件不符合条件。请检查输出目录中是否有该 Office 文件（20 MB 以内）。不会自动重发；确认未收到后可再发送 /文件 文件名。');}
+          catch {await controller.say('文件发送未确认或文件不符合条件。请检查输出目录中是否有该 PDF/Office/文本文件（20 MB 以内）。不会自动重发；确认未收到后可再发送 /文件 文件名。');}
           return;
         }
         const items=msg.item_list ?? [];
         if(items.some(i=>![1,2,3,4,5].includes(i.type))) {
-          await controller.say('这条消息包含暂不支持的附件，请使用文字、截图、微信语音、MP4 视频或 xlsx/docx/pptx 文件。');
+          await controller.say('这条消息包含暂不支持的附件，请使用文字、截图、微信语音、MP4 视频或 PDF、Office、文本文件。');
           return;
         }
         await controller.handle(text,key,(items.some(i=>[2,3,4,5].includes(i.type))||/https?:\/\//i.test(text))?async (signal,onProgress)=>[...await mediaInputs(items,{signal,onProgress}),...await officeInputs(items,cwd,{signal}),...await webInputs(text,{signal,onProgress})]:undefined);

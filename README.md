@@ -13,7 +13,7 @@
 直接在终端执行以下命令，安装 GitHub Release 中的 v0.13.1：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.1/wx-codex-bridge-0.15.1.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.1/wx-codex-bridge-0.15.1.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -129,7 +129,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.15.1/wx-codex-bridge-0.15.1.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.16.0/wx-codex-bridge-0.16.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -231,7 +231,7 @@ Claude 的 `/模型` 现在从 CLI 初始化响应读取真实模型目录，支
 
 ## Excel、Word、PPT
 
-支持直接发送 `.xlsx`、`.docx`、`.pptx` 文件（每条一份、最大 20 MB）。收到后提取文字、表格、单元格和公式供当前引擎阅读；你可以再发送“汇总销售额”“修改这份文档”“调整第三页文案”等任务。Codex 和 Claude 都可以使用独立 Python 环境中的 openpyxl、python-docx、python-pptx 编辑或生成文件，工具执行仍遵守原审批规则。
+支持直接发送 `.pdf`、`.xlsx`、`.docx`、`.pptx`，以及 `.txt`、`.md`、`.csv`、`.tsv`、`.json`、`.log`、`.yaml`、`.yml`、`.xml` 文件（每条一份、最大 20 MB）。收到后提取文字、表格、单元格和公式供当前引擎阅读；你可以再发送“汇总销售额”“修改这份文档”“调整第三页文案”等任务。Codex 和 Claude 都可以使用独立 Python 环境中的 openpyxl、python-docx、python-pptx、pypdf 编辑或生成文件，工具执行仍遵守原审批规则。
 
 首次使用需安装 Python 3（建议 3.10+），然后在本机执行：
 
@@ -242,7 +242,7 @@ wx-agent office-check
 
 Windows 使用 `wx-agent.cmd`，Python 须加入 PATH。安装命令创建用户数据目录中的独立环境，不修改系统 Python 包；需要网络下载依赖。可用 PYTHON_BINARY 指定创建环境的 Python，可用 WX_OFFICE_PYTHON 指定已有且包含上述库的 Python（office-setup 会在指定环境安装依赖）。
 
-输入原件与提取文字保存在当前工作区的 `wx-agent-input` 下，每次创建独立目录；结果另存到 `wx-agent-output`。这些文件会保留，用户可按需清理。微信发送 `/文件` 查看结果，发送 `/文件 文件名.xlsx`（或 docx/pptx）回传文件；仅允许输出目录中的普通 Office 文件，不允许目录穿越、符号链接、硬链接或大于 20 MB 的结果。未确认发送成功时不会自动重发。
+输入原件与提取文字保存在当前工作区的 `wx-agent-input` 下，每次创建独立目录；结果另存到 `wx-agent-output`。这些文件会保留，用户可按需清理。微信发送 `/文件` 查看结果，发送 `/文件 文件名.xlsx`（或 PDF/Office/上述文本格式）回传文件；仅允许输出目录中的受支持普通附件文件，不允许目录穿越、符号链接、硬链接或大于 20 MB 的结果。未确认发送成功时不会自动重发。
 
 暂不支持旧版 `.xls/.doc/.ppt`、宏文件、加密文档、PDF 或其他附件；请先转换为上述格式。解析还限制解压总量 80 MB、条目数 5000、单条目 16 MB，以避免异常压缩文件。大文档只提取部分内容，模型需要时可读取原文件。
 
@@ -285,3 +285,12 @@ wx-agent --user girlfriend model   # 查看她的模型设置
 这是应用层的工作区和会话分离，不是操作系统安全隔离；批准执行命令仍可能访问本机用户权限范围内的其他文件。不要将它作为不可信用户的隔离沙箱。
 
 移除时先 `wx-agent user stop girlfriend`，再 `wx-agent user remove girlfriend`。绑定和文件移入数据目录的 `removed-users`，不删除工作文件；已停止用户不会继续接收消息。升级安装包前需停止所有新增用户，升级后分别启动；`wx-agent update` 发现新增用户仍在运行会拒绝升级，不会打断她的任务。
+
+
+### PDF 与文本附件
+
+PDF 提取文字层并标注原页码，最多前 200 页、30000 字符；达到限制会明确提示截断。扫描版、图片、图表和排版尚不进行 OCR 或渲染识别；没有提取到文字的页会明确标记，不能当作已读懂。加密或损坏 PDF 会拒绝解析，请先提供未加密版本。可让模型按页总结、提取信息，或使用 pypdf 合并、拆分等；具体文件操作仍遵循审批。
+
+文本文件支持 UTF-8、带 BOM 的 UTF-16 和 GB18030 解码，最多提取 30000 字符，不执行文本中的代码。TXT/Markdown/CSV/JSON 等仅按文本读取，不保证已验证结构或格式。原文件保留在独立用户工作区，处理结果可通过 `/文件 文件名.pdf` 或 `/文件 result.md` 等命令取回。
+
+旧版本升级后，PDF/Office 用户请再运行一次 `wx-agent office-setup` 安装 pypdf，再用 `wx-agent office-check` 验证。文本附件不依赖 Python。
