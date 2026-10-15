@@ -87,13 +87,13 @@ wx-agent user stop teammate    # 只停止指定用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.17.0/wx-codex-bridge-0.17.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.0/wx-codex-bridge-0.18.0.tgz --ignore-scripts
 ```
 
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.17.0/wx-codex-bridge-0.17.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.0/wx-codex-bridge-0.18.0.tgz --ignore-scripts
 ```
 
 安装包通过 GitHub Releases 提供，尚未发布到 npm。没有全局目录写入权限时，参见[用户目录安装](docs/setup.md#安装)。
@@ -145,6 +145,8 @@ wx-agent media-check   # 检查视频组件和转写模型
 | `/引擎`、`/引擎 claude`、`/引擎 codex` | 查看或切换引擎 |
 | `/模型`、`/模型 模型名` | 查看目录或切换模型 |
 | `/任务`、`/开始`、`/取消 编号` | 查看队列、立即提交、移除等待任务 |
+| `/会话`、`/新会话 名称` | 查看或创建会话，旧会话保留 |
+| `/切换会话 编号`、`/删除会话 编号` | 恢复上下文或移除桥接会话记录 |
 | `/项目`、`/项目 名称` | 列出并切换登记项目 |
 | `/状态`、`/取消` | 查看进度或中断当前任务 |
 | `/新会话`、`/结果` | 开启新上下文或获取最近结果 |

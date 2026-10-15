@@ -11,6 +11,7 @@ import {modelListText,modelInfo,prepareModel} from './models.mjs';
 import {officeInputs,workspaceDir,FILE_EXTS} from './office.mjs';
 import {sendOfficeFile} from './file-send.mjs';
 import {webInputs} from './web.mjs';
+import {isConversationMutation} from './conversations.mjs';
 import {TaskQueue} from './task-queue.mjs';
 import {projectList,projectPath} from './projects.mjs';
 import {outputSnapshot,returnFiles} from './auto-files.mjs';
@@ -194,7 +195,7 @@ async function main() {
       }finally{controller.onSettled=null;taskToken=null;beforeFiles=null;}
     }});
   }
-  server = await serve(p, () => ({pid:process.pid,startedAt,...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,project:currentProject,queued:tasks?.pending.length || 0,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):(tasks?.busy?'排队中':'空闲')}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc));
+  server = await serve(p, () => ({pid:process.pid,startedAt,...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,project:currentProject,conversation:controller?.state.currentConversation,queued:tasks?.pending.length || 0,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):(tasks?.busy?'排队中':'空闲')}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc));
   console.log('桥接已启动。微信发送 /帮助 或直接发送任务；wx-agent status 查看状态。');
   let failures = 0;
   while (true) {
@@ -219,7 +220,7 @@ async function main() {
           catch(e){await controller.say('项目切换失败：'+e.message);}
           finally{changing=false;}return;
         }
-        if(text==='/新会话' && tasks.busy){await controller.say('请先等待任务完成或取消，并 /清空队列 后再新建会话。');return;}
+        if(isConversationMutation(text) && tasks.busy){await controller.say('请先等待任务完成或取消，并 /清空队列 后再创建、切换或删除会话。');return;}
         if(text==='/模型') {await controller.say(await modelListText(config,engine,controller.rpc));return;}
         if(text.startsWith('/模型 ')) {
           try {const info=await selectModel(text.slice(4).trim());await controller.say(`模型已设置为 ${info.model}，下一条任务生效；可用性由账号或服务商决定。`);}

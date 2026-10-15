@@ -1,11 +1,13 @@
 import {randomBytes} from 'node:crypto';
+import {ensureConversations,syncConversation,conversationList,changeConversation,isConversationMutation} from './conversations.mjs';
 import {officePython} from './office.mjs';
 
-export const HELP = '直接发网页链接、文字、截图、微信语音、MP4 视频或 PDF、Office、TXT/MD/CSV 等文本附件即可交给当前引擎。视频最长 30 分钟、最大 200 MB，抽帧并分段转写音轨；语音只使用微信附带转文字。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/项目：查看登记项目；/项目 名称 切换\n/任务 或 /队列：查看任务列表\n/开始：立即提交合并中的消息\n/取消 编号：移除等待任务；/清空队列：移除所有等待任务\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/文件：列出结果；/文件 文件名 取回附件文件\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
+export const HELP = '直接发网页链接、文字、截图、微信语音、MP4 视频或 PDF、Office、TXT/MD/CSV 等文本附件即可交给当前引擎。视频最长 30 分钟、最大 200 MB，抽帧并分段转写音轨；语音只使用微信附带转文字。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/项目：查看登记项目；/项目 名称 切换\n/任务 或 /队列：查看任务列表\n/开始：立即提交合并中的消息\n/取消 编号：移除等待任务；/清空队列：移除所有等待任务\n/状态：查看任务\n/取消：中断任务\n/会话 或 /会话列表：列出当前项目和引擎的会话\n/切换会话 编号：恢复会话\n/删除会话 编号：移除桥接会话记录\n/新会话 [名称]：创建会话，保留旧会话\n/文件：列出结果；/文件 文件名 取回附件文件\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
 
 export class Controller {
   constructor({rpc, cwd, state = {}, save, send, approvalMs = 300000, label = 'Codex', onFinish = async()=>{}}) {
     Object.assign(this, {rpc, cwd, state, save, send, approvalMs, label, onFinish});
+    ensureConversations(state);this.save=async()=>{syncConversation(state);await save(state);};
     this.active = null; this.ready = false; this.approvals = new Map(); this.items = new Map(); this.queue = Promise.resolve();
     this.delivery = Promise.resolve();
     rpc.on('notification', m => {this.queue = this.queue.then(() => this.event(m)).catch(() => this.say('处理任务事件失败，请发送 /状态 检查。'));});
@@ -33,7 +35,7 @@ export class Controller {
   }
   async handle(text, key, prepareImages) {
     if (text === '/帮助') return this.say(HELP);
-    if (text === '/状态') return this.say(`工作区：${this.cwd}\n${this.label}：${this.ready ? '已连接' : '已断开'}\n任务：${this.active ? (this.approvals.size ? '等待确认' : '执行中') : '空闲'}\n${this.active?.stage || ''}`);
+    if (text === '/状态') return this.say(`工作区：${this.cwd}\n会话：${this.state.currentConversation}\n${this.label}：${this.ready ? '已连接' : '已断开'}\n任务：${this.active ? (this.approvals.size ? '等待确认' : '执行中') : '空闲'}\n${this.active?.stage || ''}`);
     if (text === '/结果') return this.say(this.state.lastResult || '还没有已完成的任务。');
     if (text.startsWith('/批准 ') || text.startsWith('/拒绝 ') || text.startsWith('/回答 ')) return this.answer(text);
     if (text === '/取消') {
@@ -43,10 +45,18 @@ export class Controller {
       await this.rpc.request('turn/interrupt', {threadId:this.state.threadId, turnId:this.active.turnId});
       return this.say(`已请求取消，等待 ${this.label} 确认。`);
     }
-    if (text === '/新会话') {
-      if (this.active) return this.say('任务正在执行，请先 /取消，完成后再新建会话。');
-      this.state.threadId = null; this.loaded = false; await this.save(this.state);
-      return this.say('已开始新的对话上下文，工作区文件保持不变。');
+    if (/^\/(会话|会话列表)(?:\s|$)/.test(text)) {
+      try{return this.say(conversationList(this.state,text.trim().split(/\s+/)[1]===undefined?1:Number(text.trim().split(/\s+/)[1])));}catch(e){return this.say(e.message);}
+    }
+    if (isConversationMutation(text)) {
+      if(this.active)return this.say('任务正在执行，请完成或取消后再管理会话。');
+      const [,command,value='']=text.match(/^\/(新会话|切换会话|删除会话)(?:\s+([\s\S]*))?$/) || [];
+      const backup=structuredClone(this.state);
+      try{
+        const result=changeConversation(this.state,{'新会话':'new','切换会话':'switch','删除会话':'delete'}[command],value.trim());
+        await this.save(this.state);if(result.changed){this.loaded=false;this.items.clear();this.clearApprovals(true);}
+        return this.say(command==='删除会话'?`已删除桥接会话记录 ${value.trim()}。当前会话：${this.state.currentConversation}。项目文件和引擎本机历史未删除。`:`${command==='新会话'?'已创建':'已切换到'}会话 ${result.id}，下一条任务使用此上下文。`);
+      }catch(e){for(const k of Object.keys(this.state))delete this.state[k];Object.assign(this.state,backup);return this.say('会话操作未完成：'+e.message);}
     }
     if (text.startsWith('/')) return this.say('未知命令。\n' + HELP);
     if (!this.ready) return this.say(`${this.label} 未连接，请在电脑上重启桥接程序。`);
@@ -78,6 +88,7 @@ export class Controller {
     });
   }
   async start(text, key, images = []) {
+    syncConversation(this.state,text);
     await this.thread();
     this.state.active = {startedAt:Date.now()}; await this.save(this.state);
     await this.say(`${this.label} 已接收任务，正在配置的工作区处理。可发送 /状态 或 /取消。`);

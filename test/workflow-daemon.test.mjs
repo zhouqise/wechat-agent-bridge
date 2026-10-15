@@ -39,5 +39,12 @@ return new Response(JSON.stringify({ret:0,msgs}));};`);
   const files=(await out()).filter(x=>x.msg.item_list[0].type===4);assert.deepEqual(files.map(x=>x.msg.context_token),['ctx2','ctx4']);assert.ok(files.every(x=>x.msg.to_user_id==='owner'));
   await batch([msg('/项目 other')]);await wait(async()=>(await status()).project==='other');await batch([msg('other task'),msg('/开始')]);await wait(async()=>(await status()).task==='空闲'&&(await calls()).length===3);
   await batch([msg('/项目 default')]);await wait(async()=>(await status()).project==='default');await batch([msg('resume task'),msg('/开始')]);await wait(async()=>(await calls()).length===4);const final=await calls();assert.equal(final[3].threadId,final[0].threadId);assert.notEqual(final[2].threadId,final[0].threadId);
+  await wait(async()=>(await status()).task==='空闲');const original=(await status()).conversation;
+  await batch([msg('/新会话 新主题')]);await wait(async()=>(await status()).conversation!==original);const newer=(await status()).conversation;
+  await batch([msg('/会话')]);await wait(async()=>(await out()).some(x=>x.msg.item_list[0].text_item?.text.includes('新主题')));
+  await batch([msg('/切换会话 '+original)]);await wait(async()=>(await status()).conversation===original);
+  await batch([msg('/删除会话 '+newer)]);await wait(async()=>(await out()).some(x=>x.msg.item_list[0].text_item?.text.includes('已删除桥接会话记录 '+newer)));
+  await run('restart');assert.equal((await status()).conversation,original);
+
  }finally{await run('stop').catch(()=>{});await fs.rm(dir,{recursive:true,force:true});}
 });
