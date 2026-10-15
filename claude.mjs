@@ -28,8 +28,8 @@ export async function inWorkspace(cwd,value) {
   return relative==='' || (!relative.startsWith('..'+path.sep) && relative!=='..' && !path.isAbsolute(relative));
 }
 export class ClaudeRPC extends EventEmitter {
-  constructor({cwd,proxy,auth='local',binary,spawnFn=spawn,check=exec}={}) {
-    super();Object.assign(this,{cwd,proxy,auth,spawnFn,check});this.pending=new Map();this.closed=false;
+  constructor({cwd,proxy,auth='local',model,binary,spawnFn=spawn,check=exec}={}) {
+    super();Object.assign(this,{cwd,proxy,auth,model,spawnFn,check});this.pending=new Map();this.closed=false;
     if(!['local','api'].includes(auth))throw new Error('Claude 认证方式只能是 local 或 api');
     this.env={...process.env};if(binary)this.env.CLAUDE_BINARY=binary;
     if(auth==='api'){delete this.env.CLAUDE_CODE_OAUTH_TOKEN;delete this.env.ANTHROPIC_AUTH_TOKEN;}
@@ -59,6 +59,7 @@ export class ClaudeRPC extends EventEmitter {
         '--strict-mcp-config','--mcp-config','{"mcpServers":{}}','--no-chrome','--disable-slash-commands',
         '--tools',TOOLS.join(','),'--append-system-prompt',this.instructions || '仅操作当前工作区，用中文回复。',
         this.resume?'--resume':'--session-id',this.threadId];
+      if(this.model)args.push('--model',this.model);
       const command=claudeCommand(args,{env:this.env});
       const child=this.spawnFn(command.file,command.args,{cwd:this.cwd,env:this.env,stdio:['pipe','pipe','pipe'],shell:false,windowsHide:true});
       const run={child,turnId,threadId:this.threadId,content,initialized:false};this.run=run;

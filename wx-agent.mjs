@@ -7,6 +7,7 @@ import {promisify} from 'node:util';
 import {createInterface} from 'node:readline/promises';
 import {paths,privateDir,readJSON,writeJSON,alive,acquireLock,releaseLock} from './paths.mjs';
 import {control} from './service.mjs';
+import {modelInfo,modelConfig} from './models.mjs';
 import {codexSettings} from './codex-config.mjs';
 import {CodexRPC} from './rpc.mjs';
 import {codexCommand,claudeCommand} from './platform.mjs';
@@ -27,6 +28,7 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
   logs           查看最近日志（logs --follow 持续查看）
   doctor         检查当前引擎（--engine claude 或 codex）
   engine [名称]  查看或切换默认引擎，保留独立会话
+  model [模型名] 查看或切换当前引擎模型
   login          交互式微信扫码（login --force 重新绑定）
   run            前台运行，Ctrl+C 停止
   migrate        导入本目录旧版绑定和配置，保留旧文件备份
@@ -187,6 +189,27 @@ async function engine() {
   console.log(`默认引擎已设置为 ${next}，两个引擎的会话独立保留。`);
   if(wasRunning)await start();
 }
+async function model() {
+  const value=process.argv[3];
+  const current=await running();
+  if(!value) {
+    const config=await readJSON(p.config,{});
+    const info=current || modelInfo(config,config.engine || 'codex');
+    console.log(`当前引擎：${info.engine}，模型设置：${info.model || '沿用引擎默认模型'}`);return;
+  }
+  if(current) {
+    const result=await control(p,'model',{model:value});
+    if(result.error)throw new Error(result.error);
+    console.log(`模型已设置为 ${result.model}，下一条任务生效；可用性由账号或服务商决定。`);return;
+  }
+  await privateDir(p.dir);await acquireLock(p);
+  try {
+    const config=await readJSON(p.config,{});
+    const next=modelConfig(config,config.engine || 'codex',value);
+    await writeJSON(p.config,next);
+    console.log('模型设置已保存，下次启动生效。');
+  }finally{await releaseLock(p);}
+}
 async function logs() {
   let position=0;
   async function read(initial=false) {
@@ -223,10 +246,10 @@ async function migrate() {
 try {
   if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
-  const commands={setup,start,stop,engine,restart:async()=>{await stop();await start();},status,logs,doctor,
+  const commands={setup,start,stop,engine,model,restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.7.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.8.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

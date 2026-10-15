@@ -14,7 +14,7 @@ function mock() {
 async function setup(t) {
   const cwd=await fs.mkdtemp(path.join(os.tmpdir(),'wxc-cl-'));t.after(()=>fs.rm(cwd,{recursive:true,force:true}));
   const children=[],calls=[],events=[],requests=[];
-  const rpc=new ClaudeRPC({cwd,binary:'fake-claude.exe',check:async()=>({stdout:'test'}),spawnFn:(file,args,options)=>{calls.push({file,args,options});const child=mock();children.push(child);return child;}});
+  const rpc=new ClaudeRPC({cwd,model:'sonnet',binary:'fake-claude.exe',check:async()=>({stdout:'test'}),spawnFn:(file,args,options)=>{calls.push({file,args,options});const child=mock();children.push(child);return child;}});
   rpc.on('notification',m=>events.push(m));rpc.on('request',m=>requests.push(m));t.after(()=>rpc.close());
   await rpc.initialize();await rpc.request('thread/start',{});
   await rpc.request('turn/start',{input:[{type:'text',text:'test'}]});
@@ -23,7 +23,7 @@ async function setup(t) {
 test('Claude 启动使用受控工具与默认权限，握手成功后传入文本和图片',async t=>{
   const {rpc,child,calls}=await setup(t);let written='';child.stdin.on('data',b=>written+=b);
   assert.equal(calls[0].options.shell,false);
-  const args=calls[0].args;assert.equal(args[args.indexOf('--permission-mode')+1],'default');
+  const args=calls[0].args;assert.equal(args[args.indexOf('--model')+1],'sonnet');assert.equal(args[args.indexOf('--permission-mode')+1],'default');
   assert.equal(args[args.indexOf('--setting-sources')+1],'user');
   assert.ok(args.includes('--strict-mcp-config'));assert.ok(args.includes('--disable-slash-commands'));
   assert.deepEqual(JSON.parse(args[args.indexOf('--settings')+1]).permissions.ask,['Read','Glob','Grep','Bash','Edit','Write']);

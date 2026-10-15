@@ -3,12 +3,12 @@ import fs from 'node:fs/promises';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
 import {readJSON,writeJSON} from './paths.mjs';
 
-export async function control(p,command='status') {
+export async function control(p,command='status',params={}) {
   const token=(await readJSON(p.controlToken,{})).token;
   return new Promise((resolve,reject)=>{
     const socket=net.createConnection(p.socket);let text='';
     const timer=setTimeout(()=>{socket.destroy();reject(new Error('管理接口超时'));},2000);
-    socket.on('connect',()=>socket.write(JSON.stringify({command,token})+'\n'));
+    socket.on('connect',()=>socket.write(JSON.stringify({...params,command,token})+'\n'));
     socket.on('data',buf=>{
       text+=buf.toString();
       if(text.length>32000){socket.destroy();return;}
@@ -18,7 +18,7 @@ export async function control(p,command='status') {
     socket.on('close',()=>{clearTimeout(timer);reject(new Error('管理连接关闭'));});
   });
 }
-export async function serve(p,status,stop) {
+export async function serve(p,status,stop,setModel) {
   const win=p.platform==='win32';
   const token=randomBytes(32).toString('hex');
   if(!win && Buffer.byteLength(p.socket)>100)throw new Error('数据目录路径过长，请用 WX_CODEX_HOME 指定较短路径');
@@ -29,15 +29,18 @@ export async function serve(p,status,stop) {
     socket.on('data',buf=>{
       data+=buf.toString();if(data.length>1024){socket.destroy();return;}
       if(!data.includes('\n'))return;
-      let command;
+      let command,request;
       try {
-        const request=JSON.parse(data.split('\n')[0]);command=request.command;
+        request=JSON.parse(data.split('\n')[0]);command=request.command;
         if(typeof request.token!=='string' || request.token.length!==64 || !timingSafeEqual(Buffer.from(request.token),Buffer.from(token))) {
           socket.end('{"error":"unauthorized"}\n');socket.removeAllListeners('data');return;
         }
       }catch{socket.destroy();return;}
       if(command==='status')socket.end(JSON.stringify({service:'wx-codex',...status()})+'\n');
       else if(command==='stop') {socket.end(JSON.stringify({service:'wx-codex',stopping:true})+'\n');setTimeout(stop,100);}
+      else if(command==='model' && setModel) {
+        Promise.resolve().then(()=>setModel(request.model)).then(result=>socket.end(JSON.stringify(result)+'\n'),e=>socket.end(JSON.stringify({error:e.message})+'\n'));
+      }
       else socket.end('{"error":"unknown command"}\n');
       socket.removeAllListeners('data');
     });

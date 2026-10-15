@@ -1,6 +1,6 @@
 import {randomBytes} from 'node:crypto';
 
-export const HELP = '直接发文字或截图即可交给当前引擎。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
+export const HELP = '直接发文字或截图即可交给当前引擎。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/状态：查看任务\n/取消：中断任务\n/新会话：清空当前对话上下文\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
 
 export class Controller {
   constructor({rpc, cwd, state = {}, save, send, approvalMs = 300000, label = 'Codex'}) {

@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -35,7 +35,8 @@
     "platform.mjs",
     "claude.mjs",
     "engines.mjs",
-    "codex-config.mjs"
+    "codex-config.mjs",
+    "models.mjs"
   ],
   "os": [
     "darwin",

@@ -43,6 +43,7 @@ export class CodexRPC extends EventEmitter {
     this.child.stdin.write(JSON.stringify(message) + '\n');
   }
   request(method, params = {}) {
+    if(this.settings.model && ['thread/start','thread/resume','turn/start'].includes(method))params={...params,model:this.settings.model};
     if(this.settings.auth==='api' && ['thread/start','thread/resume'].includes(method))params={...params,model:this.settings.model,modelProvider:'wx_agent_api'};
     return new Promise((resolve, reject) => {
       const id = this.next++;
@@ -54,7 +55,7 @@ export class CodexRPC extends EventEmitter {
   respond(id, result) {this.write({id, result});}
   reject(id) {this.write({id, error: {code: -32601, message: 'Unsupported client request'}});}
   async initialize() {
-    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.7.0'}});
+    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.8.0'}});
     this.write({method:'initialized', params:{}});
   }
   close() {stopChild(this.child); this.fail(); this.lines.close();}

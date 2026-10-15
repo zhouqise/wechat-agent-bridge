@@ -4,16 +4,16 @@
 
 独立实验项目，非腾讯或 OpenAI 官方产品。当前支持 macOS、Linux 和 Windows 10/11；Windows 新增原生支持。macOS 已做真实连接验证，Windows/Linux 的微信扫码及完整模型任务仍需用户实机验证。微信账号是否可以绑定取决于服务端。
 
-从 v0.7.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
+从 v0.8.0 起仅提供 `wx-agent` 命令，已移除 `wx-codex`。安装包名和用户数据目录保持不变，升级后无需重新扫码或迁移会话。
 
 ## 安装
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.7.0：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.8.0：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.7.0/wx-codex-bridge-0.7.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.0/wx-codex-bridge-0.8.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -23,7 +23,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.7.0/wx-codex-bridge-0.7.0.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.0/wx-codex-bridge-0.8.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -125,7 +125,7 @@ npm pack
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.7.0/wx-codex-bridge-0.7.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.8.0/wx-codex-bridge-0.8.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -202,3 +202,11 @@ wx-agent.cmd start
 接口须兼容 Responses API，不能直接使用仅兼容 Chat Completions 或 Anthropic Messages 的接口。HTTPS 为默认要求，本机回环地址允许 HTTP。`wx-agent doctor --engine codex` 在 API 模式只检查配置和本机 app-server 初始化，不验证密钥有效性、余额或远端模型兼容性，也不发起付费推理。
 
 选择 `local` 可继续沿用 Codex 自己的登录和配置。API 模式通过子进程参数指定独立 provider，不修改全局 Codex 配置，不将密钥放入命令参数，也不回退 ChatGPT 登录。修改认证方式、地址或模型后会重置桥接的 Codex 会话引用，原工作文件保留。配置字段依据 [Codex 官方配置参考](https://developers.openai.com/codex/config-reference/)。
+
+## 切换模型
+
+微信发送 `/模型` 查看当前引擎的模型设置，发送 `/模型 模型名` 切换。终端使用 `wx-agent model` 查看、`wx-agent model 模型名` 切换；Windows PowerShell 使用 `wx-agent.cmd`。例如 Claude 引擎可使用 `/模型 sonnet`；Codex 请填写账号或服务商支持的模型 ID。
+
+两个引擎分别保存模型设置，切换引擎不会覆盖另一侧的模型。运行中无需重启，新模型从下一条任务生效，保留会话上下文；停止时在终端修改则下次启动生效。任务执行中（包括审批、图片下载）禁止切换。尚未指定模型时显示“沿用引擎默认模型”，不猜测实际模型名称。
+
+切换只保存模型选择，不提前发起推理或验证账号额度；若服务商拒绝模型，请改回可用模型后重试。模型切换不会改变引擎、认证方式或 API 地址。

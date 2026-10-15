@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import {randomUUID} from 'node:crypto';
 import {BASE, api, trustedBase, acceptBatch} from './bridge.mjs';
 import {engineName,makeController} from './engines.mjs';
+import {modelInfo,prepareModel} from './models.mjs';
 import {imageInputs} from './media.mjs';
 
 const p = paths();
@@ -113,7 +114,7 @@ async function main() {
   if (process.argv.includes('--login')) {console.log('微信已绑定。运行 wx-agent start 即可后台启动。');return;}
   const echo = process.argv.includes('--echo');
   let contextToken,config,cwd,engine='codex';
-  let selectEngine;
+  let selectEngine,selectModel,changing=false;
   if (!echo) {
     config = await readJSON(p.config, {});
     const requested = config.workspace || p.workspace;
@@ -143,9 +144,19 @@ async function main() {
       controller?.close();controller=candidate;engine=next;config.engine=next;
       await save(state);
     };
+    selectModel=async value=>{
+      if(changing || controller.active)throw new Error('任务执行中或配置正在变更，请稍后再切换模型');
+      changing=true;
+      try {
+        const change=prepareModel(config,engine,value);
+        await writeJSON(p.config,change.config);
+        change.apply(controller);config=change.config;
+        return modelInfo(config,engine);
+      }finally{changing=false;}
+    };
     await selectEngine(config.engine || 'codex');
   }
-  server = await serve(p, () => ({pid:process.pid,startedAt,mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):'空闲'}), () => {void clean().finally(()=>process.exit(0));});
+  server = await serve(p, () => ({pid:process.pid,startedAt,...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):'空闲'}), () => {void clean().finally(()=>process.exit(0));},selectModel);
   console.log('桥接已启动。微信发送 /帮助 或直接发送任务；wx-agent status 查看状态。');
   let failures = 0;
   while (true) {
@@ -159,14 +170,22 @@ async function main() {
       }, echo ? undefined : async (text,msg,key) => {
         lastReceivedAt = Date.now();
         contextToken = msg.context_token;
+        if(changing){await controller.say('配置正在变更，请稍后重试。');return;}
+        if(text==='/模型') {const info=modelInfo(config,engine);await controller.say(`当前引擎：${engine}，模型设置：${info.model || '沿用引擎默认模型'}。发送 /模型 模型名 切换。`);return;}
+        if(text.startsWith('/模型 ')) {
+          try {const info=await selectModel(text.slice(4).trim());await controller.say(`模型已设置为 ${info.model}，下一条任务生效；可用性由账号或服务商决定。`);}
+          catch(e){await controller.say(e.message);}
+          return;
+        }
         if(text==='/引擎') {await controller.say(`当前引擎：${engine}。发送 /引擎 codex 或 /引擎 claude 切换，两个引擎分别保留会话。`);return;}
         if(text.startsWith('/引擎 ')) {
           if(controller.active){await controller.say('任务执行中，请等待完成或 /取消 后再切换引擎。');return;}
           const next=text.slice(4).trim().toLowerCase();
           if(!['codex','claude'].includes(next)){await controller.say('请使用 /引擎 codex 或 /引擎 claude');return;}
           if(next===engine){await controller.say(`当前已经是 ${engine}。`);return;}
-          try {await selectEngine(next,true);await controller.say(`已切换到 ${engine}，该引擎的会话独立保留。`);}
+          try {changing=true;await selectEngine(next,true);await controller.say(`已切换到 ${engine}，该引擎的会话独立保留。`);}
           catch {await controller.say('引擎切换失败，仍保留原引擎。请在电脑上用 wx-agent doctor --engine '+next+' 检查安装及认证配置。');}
+          finally{changing=false;}
           return;
         }
         const items=msg.item_list ?? [];

@@ -40,3 +40,13 @@ test('API provider 密钥只在环境中，恢复会话明确使用新 provider 
     child.stdout.write(JSON.stringify({id:message.id,result:{thread:{id:'existing'}}})+'\n');await result;
   }finally {rpc.close();if(old===undefined)delete process.env.WX_TEST_API_KEY;else process.env.WX_TEST_API_KEY=old;}
 });
+
+test('本机登录模式切换模型同时覆盖恢复会话与后续任务',async()=>{
+ const {rpc,child}=setup();rpc.settings={auth:'local',model:'chosen-model',args:[]};
+ let wire='';child.stdin.on('data',b=>wire+=b);
+ for(const method of ['thread/resume','turn/start']) {
+   wire='';const result=rpc.request(method,{model:'old'});const message=JSON.parse(wire);
+   assert.equal(message.params.model,'chosen-model');assert.equal(message.params.modelProvider,undefined);
+   child.stdout.write(JSON.stringify({id:message.id,result:{}})+'\n');await result;
+ }rpc.close();
+});

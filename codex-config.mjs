@@ -2,7 +2,7 @@
 export function codexSettings(config={},env=process.env) {
   const auth=config.codexAuth || 'local';
   if(!['local','api'].includes(auth))throw new Error('Codex 认证方式只能是 local 或 api');
-  if(auth==='local')return {auth,args:[]};
+  if(auth==='local')return {auth, ...(config.codexModel?{model:config.codexModel}:{}),args:config.codexModel?['-c',`model=${JSON.stringify(config.codexModel)}`]:[]};
   const keyEnv=config.codexApiKeyEnv || 'OPENAI_API_KEY';
   if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(keyEnv))throw new Error('API Key 环境变量名称不合法');
   if(!env[keyEnv]?.trim())throw new Error('Codex API Key 环境变量未设置，请在启动桥接的终端中设置');
