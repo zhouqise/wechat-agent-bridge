@@ -55,5 +55,5 @@ def inspect(filename):
     return {'format':ext,'text':'\n'.join(lines)[:30000],'truncated':truncated,'notice':'提取文本、表格和公式；未渲染版式、图表或图片。Excel 公式不在此重新计算。'}
 
 if __name__=='__main__':
-    try: print(json.dumps(inspect(sys.argv[1]),ensure_ascii=False))
-    except Exception: print(json.dumps({'error':'文档无法解析：请确认格式正确、未加密且未超出大小或解压限制'},ensure_ascii=False));sys.exit(1)
+    try: print(json.dumps(inspect(sys.argv[1]),ensure_ascii=True))
+    except Exception: print(json.dumps({'error':'文档无法解析：请确认格式正确、未加密且未超出大小或解压限制'},ensure_ascii=True));sys.exit(1)

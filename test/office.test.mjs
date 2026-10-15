@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createDecipheriv} from 'node:crypto';
@@ -56,4 +57,11 @@ test('拒绝非微信上传地址，发送失败只尝试一次',async t=>{
  await assert.rejects(sendOfficeFile({...base,apiFn:async()=>({upload_full_url:'https://evil.example/upload'}),fetcher:()=>{throw Error('must not fetch');}}),/地址不受支持/);
  let sends=0;
  await assert.rejects(sendOfficeFile({...base,apiFn:async(b,endpoint)=>{if(endpoint.endsWith('getuploadurl'))return {upload_param:'ok'};sends++;throw Error('network');},fetcher:async()=>new Response('',{headers:{'x-encrypted-param':'ok'}})}));assert.equal(sends,1);
+});
+
+test('Office 中文 JSON 在非 UTF-8 控制台下仍可读取',async t=>{
+ const {dir}=await fixtures(t);
+ const py=await fs.stat(officePython()).then(()=>officePython(),()=>process.platform==='win32'?'python':'python3');
+ const {stdout}=await exec(py,[fileURLToPath(new URL('../office_tool.py',import.meta.url)),path.join(dir,'document.docx')],{env:{...process.env,PYTHONIOENCODING:'ascii'}});
+ assert.match(JSON.parse(stdout).text,/文档内容/);
 });

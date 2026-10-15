@@ -29,7 +29,7 @@ test('API provider 密钥只在环境中，恢复会话明确使用新 provider 
   const old=process.env.WX_TEST_API_KEY;process.env.WX_TEST_API_KEY='fake-private-test-key';
   let args,options;
   const child=new EventEmitter();child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{};
-  const rpc=new CodexRPC({config:{codexAuth:'api',codexModel:'test-model',codexBaseUrl:'https://example.com/v1',codexApiKeyEnv:'WX_TEST_API_KEY'},spawnFn:(bin,a,o)=>{args=a;options=o;return child;}});
+  const rpc=new CodexRPC({binary:'fake-codex.exe',config:{codexAuth:'api',codexModel:'test-model',codexBaseUrl:'https://example.com/v1',codexApiKeyEnv:'WX_TEST_API_KEY'},spawnFn:(bin,a,o)=>{args=a;options=o;return child;}});
   try {
     assert.equal(options.env.WX_TEST_API_KEY,'fake-private-test-key');
     assert.ok(!JSON.stringify(args).includes('fake-private-test-key'));
