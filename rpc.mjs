@@ -25,7 +25,13 @@ export class CodexRPC extends EventEmitter {
       if (m.method) this.emit(m.id === undefined ? 'notification' : 'request', m);
       else if (this.pending.has(m.id)) {
         const p = this.pending.get(m.id); clearTimeout(p.timer); this.pending.delete(m.id);
-        if (m.error) p.reject(new Error(`Codex 请求失败：${p.method}（${m.error.code}）`));
+        if (m.error) {
+          // Keep only structured, allowlisted diagnostics; never forward raw provider errors.
+          const error=new Error(`Codex 请求被拒绝：${p.method}（${Number.isInteger(m.error.code)?m.error.code:'unknown'}）`);
+          error.rpcMethod=p.method;error.confirmedRejection=true;
+          if(p.method==='thread/resume' && /already has an active writer/i.test(String(m.error.message)))error.reason='thread_busy';
+          p.reject(error);
+        }
         else p.resolve(m.result);
       }
     });
@@ -43,8 +49,8 @@ export class CodexRPC extends EventEmitter {
     this.child.stdin.write(JSON.stringify(message) + '\n');
   }
   request(method, params = {}) {
-    if(this.settings.model && ['thread/start','thread/resume','turn/start'].includes(method))params={...params,model:this.settings.model};
-    if(this.settings.auth==='api' && ['thread/start','thread/resume'].includes(method))params={...params,model:this.settings.model,modelProvider:'wx_agent_api'};
+    if(this.settings.model && ['thread/start','thread/resume','thread/fork','turn/start'].includes(method))params={...params,model:this.settings.model};
+    if(this.settings.auth==='api' && ['thread/start','thread/resume','thread/fork'].includes(method))params={...params,model:this.settings.model,modelProvider:'wx_agent_api'};
     return new Promise((resolve, reject) => {
       const id = this.next++;
       const timer = setTimeout(() => {this.pending.delete(id); reject(new Error(`Codex 请求超时：${method}`));}, 60000);
@@ -55,7 +61,7 @@ export class CodexRPC extends EventEmitter {
   respond(id, result) {this.write({id, result});}
   reject(id) {this.write({id, error: {code: -32601, message: 'Unsupported client request'}});}
   async initialize() {
-    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.18.1'}});
+    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.18.2'}});
     this.write({method:'initialized', params:{}});
   }
   close() {stopChild(this.child); this.fail(); this.lines.close();}

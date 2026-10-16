@@ -118,3 +118,23 @@ test('媒体处理期间取消会终止准备步骤，不提交模型任务',asy
  await c.handle('/取消');await c.starting;
  assert.equal(c.active,null);assert.equal(c.ready,true);assert.equal(rpc.calls.length,0);assert.ok(messages.some(m=>m.includes('取消')));
 });
+test('占用会话自动复制历史，只向新线程提交一次任务且保留原记录',async()=>{
+ const {controller:c,rpc,messages}=await setup({state:{threadId:'occupied',lastResult:'previous'}});const original=c.state.currentConversation;
+ rpc.request=async function(method,params){this.calls.push({method,params});if(method==='thread/resume')throw Object.assign(new Error('busy'),{reason:'thread_busy',confirmedRejection:true,rpcMethod:method});if(method==='thread/fork')return {thread:{id:'copy'}};return {turn:{id:'turn-copy'}};};
+ await c.handle('new request','unique');await c.starting;
+ assert.equal(c.ready,true);assert.equal(c.state.threadId,'copy');assert.notEqual(c.state.currentConversation,original);
+ assert.equal(c.state.conversations.find(x=>x.id===original).threadId,'occupied');assert.equal(c.state.conversations.find(x=>x.id===c.state.currentConversation).forkedFrom,original);
+ assert.equal(rpc.calls.filter(x=>x.method==='turn/start').length,1);assert.equal(rpc.calls.at(-1).params.threadId,'copy');
+ const fork=rpc.calls.find(x=>x.method==='thread/fork');assert.equal(fork.params.approvalPolicy,'on-request');assert.equal(fork.params.sandbox,'workspace-write');assert.equal(fork.params.cwd,c.cwd);assert.match(messages.join('\n'),/历史副本/);c.close();
+});
+test('会话复制明确拒绝保持连接，原会话不变，可以新建后继续',async()=>{
+ const {controller:c,rpc,messages}=await setup({state:{threadId:'occupied'}});let closed=0;rpc.close=()=>closed++;
+ rpc.request=async function(method,params){this.calls.push({method,params});if(method==='thread/resume')throw Object.assign(new Error(),{reason:'thread_busy',confirmedRejection:true,rpcMethod:method});if(method==='thread/fork')throw Object.assign(new Error(),{confirmedRejection:true,rpcMethod:method});if(method==='thread/start')return {thread:{id:'fresh'}};return {turn:{id:'new'}};};
+ await c.handle('task','1');await c.starting;assert.equal(c.ready,true);assert.equal(c.active,null);assert.equal(closed,0);assert.equal(c.state.threadId,'occupied');assert.equal(rpc.calls.some(x=>x.method==='turn/start'),false);assert.match(messages.at(-1),/本次任务未提交/);
+ await c.handle('/新会话');await c.handle('another','2');await c.starting;assert.equal(c.state.threadId,'fresh');assert.equal(rpc.calls.filter(x=>x.method==='turn/start').length,1);c.close();
+});
+test('启动任务结果不确定仍关闭连接，绝不复制或重复提交',async()=>{
+ const {controller:c,rpc,messages}=await setup();let closed=0;rpc.close=()=>{closed++;rpc.emit('disconnected');};
+ rpc.request=async function(method,params){this.calls.push({method,params});if(method==='thread/start')return {thread:{id:'t'}};throw Error('timeout');};
+ await c.handle('task','1');await c.starting;assert.equal(c.ready,false);assert.equal(closed,1);assert.equal(rpc.calls.filter(x=>x.method==='turn/start').length,1);assert.equal(rpc.calls.some(x=>x.method==='thread/fork'),false);assert.equal(messages.filter(x=>x.includes('连接已断开')).length,0);
+});

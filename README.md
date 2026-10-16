@@ -73,7 +73,7 @@ wx-agent user stop teammate    # 只停止指定用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.1/wx-codex-bridge-0.18.1.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.2/wx-codex-bridge-0.18.2.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -81,7 +81,7 @@ wx-agent start
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.1/wx-codex-bridge-0.18.1.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.2/wx-codex-bridge-0.18.2.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 ```

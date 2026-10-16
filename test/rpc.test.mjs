@@ -50,3 +50,13 @@ test('本机登录模式切换模型同时覆盖恢复会话与后续任务',asy
    child.stdout.write(JSON.stringify({id:message.id,result:{}})+'\n');await result;
  }rpc.close();
 });
+test('会话占用错误只保留允许的诊断，不泄露原始错误内容',async()=>{
+ const {rpc,child}=setup();const pending=rpc.request('thread/resume',{threadId:'old'});
+ child.stdout.write(JSON.stringify({id:1,error:{code:-32600,message:'thread old already has an active writer; secret=value'}})+'\n');
+ await assert.rejects(pending,e=>e.reason==='thread_busy'&&e.confirmedRejection&&e.rpcMethod==='thread/resume'&&!e.message.includes('secret'));rpc.close();
+});
+test('复制会话继承自定义 API 模型与 provider',async()=>{
+ const {rpc,child}=setup();rpc.settings={auth:'api',model:'custom',args:[]};let wire='';child.stdin.on('data',b=>wire+=b);
+ const pending=rpc.request('thread/fork',{threadId:'old'});const msg=JSON.parse(wire);assert.equal(msg.params.model,'custom');assert.equal(msg.params.modelProvider,'wx_agent_api');
+ child.stdout.write(JSON.stringify({id:msg.id,result:{thread:{id:'new'}}})+'\n');await pending;rpc.close();
+});
