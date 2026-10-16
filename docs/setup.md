@@ -6,10 +6,10 @@
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.18.3：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.19.0：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.3/wx-codex-bridge-0.18.3.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -19,7 +19,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.3/wx-codex-bridge-0.18.3.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -40,7 +40,7 @@ export PATH="$HOME/.local/bin:$PATH"
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.3/wx-codex-bridge-0.18.3.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status
@@ -53,3 +53,15 @@ wx-agent.cmd status
 默认支持 npm 官方全局安装的 Codex，也可通过 `$env:CODEX_BINARY = 'C:\Tools\codex.exe'` 指定原生可执行文件，或指定 npm 包的 `bin\codex.js`。自定义环境变量需在各管理终端保持一致。桥接不会把微信文字拼入 cmd.exe 命令。
 
 若命令找不到，重新打开终端并检查 `npm.cmd config get prefix` 对应目录是否在 PATH。网络检查使用 Windows 自带的 `curl.exe`；代理地址仍需填写完整 URL。桥接以当前 Windows 用户权限运行，不需要以管理员身份安装或启动。
+
+## 一次配置 Codex 和 Claude Code
+
+先安装并完成两个 CLI 的登录，或在启动终端设置对应 API Key 环境变量。已有桥接先执行 `wx-agent stop`，再运行 `wx-agent setup`。引擎选项输入 `both` 或 `3`，依次配置：
+
+1. Codex：本机登录或 API 认证、API 地址与密钥环境变量名称（API 模式）、模型和代理。
+2. Claude Code：本机登录或 API 认证、模型和代理。API 密钥使用 `ANTHROPIC_API_KEY`，自定义接口仍使用 `ANTHROPIC_BASE_URL` 环境变量。
+3. 默认引擎 `codex` 或 `claude`，以及两个引擎共用的工作目录。
+
+两套引擎检查通过后保存配置，微信只绑定一次；已有绑定会复用。最后执行 `wx-agent start`。微信 `/引擎 codex` 或 `/引擎 claude` 切换，模型和代理分别保存，同一用户仍一次运行一个引擎任务。
+
+回车保留已有设置，代理填 `direct` 改为直连，模型填 `default` 沿用引擎默认（Codex API 模式仍需有效模型 ID，可由 `OPENAI_MODEL` 提供）。选择单引擎时不改写另一引擎的字段。缺少 CLI 或检查失败时不会写入新的配置；修复环境后重跑即可。向导不会自动安装 CLI，也不会把 API Key 保存到配置文件。

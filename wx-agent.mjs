@@ -7,6 +7,7 @@ import {promisify} from 'node:util';
 import {createInterface} from 'node:readline/promises';
 import {paths,privateDir,readJSON,writeJSON,alive,acquireLock,releaseLock} from './paths.mjs';
 import {control} from './service.mjs';
+import {configureEngines} from './setup-engines.mjs';
 import {officeSetup,officeCheck} from './office.mjs';
 import {modelListText,modelInfo,modelConfig} from './models.mjs';
 import {codexSettings} from './codex-config.mjs';
@@ -32,7 +33,7 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
   user start/stop/status/login/logs 名称  管理指定用户
   user remove 名称  停用并归档已停止用户，保留工作文件
   --user 名称    对指定用户执行 start/status/model 等命令
-  setup          首次配置：环境检查、工作目录、代理、微信扫码
+  setup          配置 codex / claude / both，选择默认引擎并扫码
   start          后台启动，关闭终端仍运行
   stop           停止桥接及其引擎子进程
   restart        停止后重新启动
@@ -114,10 +115,10 @@ async function prerequisites(engine='codex') {
   try {const command=(engine==='claude'?claudeCommand:codexCommand)(['--version']);const {stdout}=await run(command.file,command.args,{timeout:10000,windowsHide:true});console.log(stdout.trim());}
   catch {throw new Error(engine==='claude'?'未找到 Claude Code，请先安装并在电脑上登录。':'未找到可用 Codex CLI。请先安装 Codex CLI，并执行 codex login。');}
 }
-async function doctor(config=undefined) {
+async function doctor(config=undefined,selectedEngine=undefined) {
   config ??= await readJSON(p.config,{});
   const flag=process.argv.indexOf('--engine');
-  const engine=engineName(flag>=0?process.argv[flag+1]:config.engine || 'codex');
+  const engine=engineName(selectedEngine || (flag>=0?process.argv[flag+1]:config.engine || 'codex'));
   await prerequisites(engine);
   const cwd=config.workspace || p.workspace;await fs.mkdir(cwd,{recursive:true});
   if(engine==='claude') {
@@ -156,50 +157,28 @@ async function setup() {
   await privateDir(p.dir);
   const old=await readJSON(p.config,{});
   const rl=createInterface({input:process.stdin,output:process.stdout});
-  let config;
+  let config,engines;
   try {
-    const engine=engineName((await rl.question(`引擎 codex / claude（回车使用 ${old.engine || 'codex'}）：`)).trim().toLowerCase() || old.engine || 'codex');
-    await prerequisites(engine);
-    let codexAuth=old.codexAuth || 'local',codexBaseUrl=old.codexBaseUrl || '',codexModel=old.codexModel || '',codexApiKeyEnv=old.codexApiKeyEnv || 'OPENAI_API_KEY';
-    if(engine==='codex') {
-      codexAuth=(await rl.question(`Codex 认证 local（已有登录/配置）/ api（API Key），回车使用 ${codexAuth}：`)).trim() || codexAuth;
-      if(!['local','api'].includes(codexAuth))throw new Error('认证方式请输入 local 或 api');
-      if(codexAuth==='api') {
-        codexBaseUrl=(await rl.question(`API 基础地址（回车使用 ${codexBaseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'}）：`)).trim() || codexBaseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-        codexModel=(await rl.question(`模型 ID（回车使用 ${codexModel || process.env.OPENAI_MODEL || '未设置，请输入服务商提供的模型 ID'}）：`)).trim() || codexModel || process.env.OPENAI_MODEL || '';
-        codexApiKeyEnv=(await rl.question(`密钥环境变量名称（回车使用 ${codexApiKeyEnv}，不要输入密钥本身）：`)).trim() || codexApiKeyEnv;
-        console.log('密钥只从指定环境变量读取；接口须支持 Responses API。');
-      }
-    }
-    let claudeAuth=old.claudeAuth || 'local';
-    if(engine==='claude') {
-      claudeAuth=(await rl.question(`Claude 认证 local（本机登录）/ api（环境变量 API Key），回车使用 ${claudeAuth}：`)).trim() || claudeAuth;
-      if(!['local','api'].includes(claudeAuth))throw new Error('认证方式请输入 local 或 api');
-      if(claudeAuth==='api')console.log('API Key 仅从 ANTHROPIC_API_KEY 环境变量读取，不要在这里输入密钥。');
-    }
-    const proxyField=engine==='codex'?'codexProxy':'claudeProxy';
-    const workspace=(await rl.question(`工作目录（回车使用 ${old.workspace || p.workspace}）：`)).trim() || old.workspace || p.workspace;
-    const proxyText=(await rl.question(`当前引擎代理（回车保留 ${old[proxyField] || '直连'}，输入 direct 改为直连）：`)).trim();
-    const proxy=proxyText==='direct'?'':proxyText || old[proxyField] || '';
-    if(proxy) {const u=new URL(proxy);if(!['http:','https:','socks5:','socks5h:'].includes(u.protocol)||u.username||u.password)throw new Error('请输入不含账号密码的 HTTP/SOCKS 代理地址');}
+    ({config,engines}=await configureEngines({old,ask:q=>rl.question(q),check:prerequisites,log:console.log}));
+    const workspace=(await rl.question(`工作目录（两个引擎共用；回车使用 ${old.workspace || p.workspace}）：`)).trim() || old.workspace || p.workspace;
     const expanded=workspace.startsWith('~/')?path.join((await import('node:os')).homedir(),workspace.slice(2)):workspace;
     const full=path.resolve(expanded);await fs.mkdir(full,{recursive:true});
-    config={...old,engine,codexAuth,codexBaseUrl,codexModel,codexApiKeyEnv,claudeAuth,workspace:await fs.realpath(full),[proxyField]:proxy};
-      if(engine==='codex')codexSettings(config);
+    config.workspace=await fs.realpath(full);
   }finally{rl.close();}
   // 修改配置与启动共用锁，阻止配置向导和后台实例同时改变目录。
   await acquireLock(p);
   try {
+    for(const engine of engines){console.log(`正在检查 ${engine}……`);await doctor(config,engine);}
     const session=await readJSON(p.session,null);
-    if(session && old.workspace===config.workspace && ['codexAuth','codexBaseUrl','codexModel','codexApiKeyEnv'].some(k=>old[k]!==config[k])) {session.codex={workspace:config.workspace};for(const slot of Object.values(session.projectSessions || {}))delete slot.codex;await writeJSON(p.session,session);}
+    const codexDefaults={codexAuth:'local',codexBaseUrl:'',codexModel:'',codexApiKeyEnv:'OPENAI_API_KEY'};
+    if(session && old.workspace===config.workspace && Object.keys(codexDefaults).some(k=>(old[k] || codexDefaults[k])!==(config[k] || codexDefaults[k]))) {session.codex={workspace:config.workspace};for(const slot of Object.values(session.projectSessions || {}))delete slot.codex;await writeJSON(p.session,session);}
     if(session && old.workspace!==config.workspace) {
       session.codex={workspace:config.workspace};session.claude={workspace:config.workspace};config.currentProject='default';await writeJSON(p.session,session);
       console.log('工作目录变化，已为新目录清空会话引用，原工作文件未删除。');
     }
     await writeJSON(p.config,config);
   }finally{await releaseLock(p);}
-  console.log('配置已保存，正在检查当前引擎……');
-  await doctor(config);
+  console.log(`已配置 ${engines.join(' + ')}，默认引擎：${config.engine}。微信用 /引擎 切换。`);
   await foreground(['--login']);
   console.log('配置完成！现在执行 wx-agent start 即可。');
 }
@@ -341,7 +320,7 @@ try {
   const commands={project,'ocr-check':async()=>{await ocrCheck();console.log('OCR 环境已就绪（中英文）。');},'ocr-setup':async()=>{await ocrSetup();console.log('OCR 环境已就绪。');},setup,start,stop,update,user,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('PDF / Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.18.3'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.19.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

@@ -73,7 +73,7 @@ wx-agent user stop teammate    # 只停止指定用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.3/wx-codex-bridge-0.18.3.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -81,12 +81,12 @@ wx-agent start
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.3/wx-codex-bridge-0.18.3.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 ```
 
-按提示选择引擎、认证方式、工作目录和代理，再用微信扫码。工作目录可直接回车，使用独立空白工作区，之后无需每条消息指定目录。
+向导支持 `codex`、`claude`、`both`（两个都配置，也可输入 `3`）。选择 `both` 后，分别设置两套认证、模型和代理，再选择默认引擎；工作目录与微信扫码只设置一次。两个 CLI 需预先安装，向导不会自动安装它们。工作目录可直接回车，使用独立空白工作区，之后无需每条消息指定目录。
 
 安装包通过 GitHub Releases 提供，尚未发布到 npm。全局目录权限、引擎安装及代理配置见[完整安装指南](docs/setup.md)。
 
