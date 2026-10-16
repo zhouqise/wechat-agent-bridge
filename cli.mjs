@@ -220,7 +220,7 @@ async function main() {
           catch(e){await controller.say('项目切换失败：'+e.message);}
           finally{changing=false;}return;
         }
-        if(isConversationMutation(text) && tasks.busy){await controller.say('请先等待任务完成或取消，并 /清空队列 后再创建、切换或删除会话。');return;}
+        if(isConversationMutation(text) && tasks.busy){await controller.say('请先等待任务完成或取消，并 /清空队列 后再创建、切换、删除或清空会话。');return;}
         if(text==='/模型') {await controller.say(await modelListText(config,engine,controller.rpc));return;}
         if(text.startsWith('/模型 ')) {
           try {const info=await selectModel(text.slice(4).trim());await controller.say(`模型已设置为 ${info.model}，下一条任务生效；可用性由账号或服务商决定。`);}

@@ -73,7 +73,7 @@ wx-agent user stop teammate    # 只停止指定用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.2/wx-codex-bridge-0.18.2.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.3/wx-codex-bridge-0.18.3.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -81,7 +81,7 @@ wx-agent start
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.2/wx-codex-bridge-0.18.2.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.18.3/wx-codex-bridge-0.18.3.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 ```
@@ -138,6 +138,7 @@ ID：a1b2c3d4
 - `/新会话 名称`：创建新上下文，保留旧会话；不填名称时自动取第一条任务作为标题。
 - `/会话 2`：翻到第 2 页，每页 10 个会话。
 - `/结果`：获取当前会话的最近结果。
+- `/清空会话`（或 `/清空所有会话`）：清空当前用户、项目和引擎的会话列表，同时创建并切换到新会话。
 - `/删除会话 ID`：移除桥接会话记录，保留项目文件和引擎本机历史。
 
 会话按**用户 → 项目 → 引擎**分别管理，每组最多 100 个。运行、排队或回传期间可以查看列表，变更会话需先结束当前任务并清空等待队列。列表只包含本桥接登记的会话，不导入桌面应用或 CLI 的全部历史。
@@ -184,6 +185,7 @@ OCR、视频转写可能存在错漏，视频画面是抽样；Office 复杂版�
 | --- | --- |
 | 引擎与模型 | `/引擎`、`/引擎 claude`、`/引擎 codex`、`/模型`、`/模型 模型名` |
 | 会话管理 | `/会话`、`/新会话 名称`、`/切换会话 序号或ID`、`/删除会话 ID` |
+| 清空会话 | `/清空会话`（别名 `/清空所有会话`），清空当前列表并新建 |
 | 项目切换 | `/项目`、`/项目 名称` |
 | 队列管理 | `/任务`、`/开始`、`/取消 任务编号`、`/清空队列` |
 | 进度与结果 | `/状态`、`/取消`、`/结果` |

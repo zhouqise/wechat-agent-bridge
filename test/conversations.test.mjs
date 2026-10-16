@@ -37,3 +37,18 @@ test('可复制命令与固定短序号：排序、重启和删除后不指向�
  const restored=JSON.parse(JSON.stringify(state));changeConversation(restored,'delete','1');assert.throws(()=>changeConversation(restored,'switch','1'),/不存在/);
  changeConversation(restored,'new','第三个');syncConversation(restored);assert.equal(ensureConversations(restored).number,3);assert.equal(restored.conversations.find(c=>c.id===second).number,2);
 });
+test('清空当前列表后只留新会话，旧 ID 和序号失效且不影响其他项目引擎',()=>{
+ const root={},state=engineState(root,'codex','/one'),other=engineState(root,'claude','/one'),project=engineState(root,'codex','/two');
+ const untouched=JSON.stringify([other,project]);ensureConversations(state);changeConversation(state,'new','two');state.threadId='old-thread';state.lastResult='old-result';syncConversation(state);
+ const ids=state.conversations.map(c=>c.id),numbers=state.conversations.map(c=>c.number);changeConversation(state,'clear','');
+ assert.equal(state.conversations.length,1);assert.equal(state.threadId,null);assert.equal(state.lastResult,null);assert.equal(state.active,null);assert.ok(!ids.includes(state.currentConversation));assert.ok(ensureConversations(state).number>Math.max(...numbers));assert.equal(JSON.stringify([other,project]),untouched);
+ const restored=JSON.parse(JSON.stringify(state));assert.equal(restored.conversations.length,1);for(const id of ids)assert.throws(()=>changeConversation(restored,'switch',id),/不存在/);
+});
+test('清空命令支持别名、拒绝忙碌和多余参数、持久化失败回滚',async()=>{
+ class RPC extends EventEmitter{async initialize(){} close(){}}
+ const messages=[];let fail=false;const c=new Controller({rpc:new RPC(),cwd:'/tmp/test',state:{threadId:'original',lastResult:'result'},send:async s=>messages.push(s),save:async()=>{if(fail)throw Error('disk');}});await c.initialize();const original=c.state.currentConversation;
+ c.active={};await c.handle('/清空所有会话');assert.equal(c.state.currentConversation,original);c.active=null;
+ await c.handle('/清空会话 错误参数');assert.equal(c.state.currentConversation,original);
+ fail=true;await c.handle('/清空会话');assert.equal(c.state.currentConversation,original);assert.equal(c.state.threadId,'original');fail=false;
+ for(const command of ['/清空会话','/清空所有会话']){const old=c.state.currentConversation;c.loaded=true;await c.handle(command);assert.equal(c.state.conversations.length,1);assert.notEqual(c.state.currentConversation,old);assert.equal(c.state.threadId,null);assert.equal(c.loaded,false);assert.match(messages.at(-1),/并创建新会话/);}c.close();
+});

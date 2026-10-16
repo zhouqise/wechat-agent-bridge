@@ -20,12 +20,16 @@ export function conversationList(state,page=1){
   const all=[...state.conversations].sort((a,b)=>b.updatedAt-a.updatedAt),pages=Math.max(1,Math.ceil(all.length/10));
   if(!Number.isInteger(page)||page<1||page>pages)throw Error(`页码须在 1–${pages} 之间`);
   const current=state.conversations.find(c=>c.id===state.currentConversation);
-  return `当前：${current.title}（序号 ${current.number}）\n会话 ID：${current.id}\n会话列表 ${page}/${pages}（${all.length} 个）\n\n`+all.slice((page-1)*10,page*10).map(c=>`${c.number}. ${[...c.title].slice(0,30).join('')}${[...c.title].length>30?'…':''}${c.id===state.currentConversation?' 【当前】':''}\nID：${c.id}\n/切换会话 ${c.id}\n快捷：/切换会话 ${c.number}\n/删除会话 ${c.id}`).join('\n\n')+'\n\n复制上面的完整命令即可。也可输入 /切换会话 ID。\n序号固定，不随排序变化；删除后不复用。\n/新会话 可选名称'+(pages>1?`\n/会话 ${page<pages?page+1:1}`:'');
+  return `当前：${current.title}（序号 ${current.number}）\n会话 ID：${current.id}\n会话列表 ${page}/${pages}（${all.length} 个）\n\n`+all.slice((page-1)*10,page*10).map(c=>`${c.number}. ${[...c.title].slice(0,30).join('')}${[...c.title].length>30?'…':''}${c.id===state.currentConversation?' 【当前】':''}\nID：${c.id}\n/切换会话 ${c.id}\n快捷：/切换会话 ${c.number}\n/删除会话 ${c.id}`).join('\n\n')+'\n\n复制上面的完整命令即可。也可输入 /切换会话 ID。\n序号固定，不随排序变化；删除后不复用。\n/新会话 可选名称\n/清空会话（清空当前列表并新建）'+(pages>1?`\n/会话 ${page<pages?page+1:1}`:'');
 }
 export function changeConversation(state,action,value){
   syncConversation(state);
   let target;
-  if(action==='new'){
+  if(action==='clear'){
+    if(value)throw Error('清空会话不需要参数，请发送 /清空会话');
+    state.conversations=[];state.currentConversation=null;state.threadId=null;state.lastResult=null;state.active=null;
+    target=ensureConversations(state);
+  }else if(action==='new'){
     if(state.conversations.length>=100)throw Error('当前项目和引擎已达到 100 个会话，请先删除不再需要的会话');
     if([...String(value || '')].length>60)throw Error('会话名称最多 60 字');
     target={id:randomBytes(4).toString('hex'),title:titleOf(value)||'新会话',createdAt:Date.now(),updatedAt:Date.now(),threadId:null,lastResult:null};state.conversations.push(target);
@@ -41,4 +45,4 @@ export function changeConversation(state,action,value){
   state.currentConversation=target.id;state.threadId=target.threadId;state.lastResult=target.lastResult;state.active=null;target.updatedAt=Date.now();
   return {id:target.id,changed:true};
 }
-export const isConversationMutation=text=>/^\/(新会话|切换会话|删除会话)(?:\s|$)/.test(text);
+export const isConversationMutation=text=>/^\/(新会话|切换会话|删除会话|清空会话|清空所有会话)(?:\s|$)/.test(text);

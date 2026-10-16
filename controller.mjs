@@ -2,7 +2,7 @@ import {randomBytes} from 'node:crypto';
 import {ensureConversations,syncConversation,conversationList,changeConversation,isConversationMutation} from './conversations.mjs';
 import {officePython} from './office.mjs';
 
-export const HELP = '直接发网页链接、文字、截图、微信语音、MP4 视频或 PDF、Office、TXT/MD/CSV 等文本附件即可交给当前引擎。视频最长 30 分钟、最大 200 MB，抽帧并分段转写音轨；语音只使用微信附带转文字。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/项目：查看登记项目；/项目 名称 切换\n/任务 或 /队列：查看任务列表\n/开始：立即提交合并中的消息\n/取消 编号：移除等待任务；/清空队列：移除所有等待任务\n/状态：查看任务\n/取消：中断任务\n/会话 或 /会话列表：列出当前项目和引擎的会话\n/切换会话 序号或ID：恢复会话\n/删除会话 编号：移除桥接会话记录\n/新会话 [名称]：创建会话，保留旧会话\n/文件：列出结果；/文件 文件名 取回附件文件\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
+export const HELP = '直接发网页链接、文字、截图、微信语音、MP4 视频或 PDF、Office、TXT/MD/CSV 等文本附件即可交给当前引擎。视频最长 30 分钟、最大 200 MB，抽帧并分段转写音轨；语音只使用微信附带转文字。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/项目：查看登记项目；/项目 名称 切换\n/任务 或 /队列：查看任务列表\n/开始：立即提交合并中的消息\n/取消 编号：移除等待任务；/清空队列：移除所有等待任务\n/状态：查看任务\n/取消：中断任务\n/会话 或 /会话列表：列出当前项目和引擎的会话\n/切换会话 序号或ID：恢复会话\n/删除会话 编号：移除桥接会话记录\n/新会话 [名称]：创建会话，保留旧会话\n/清空会话 或 /清空所有会话：清空当前列表并新建\n/文件：列出结果；/文件 文件名 取回附件文件\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
 
 export class Controller {
   constructor({rpc, cwd, state = {}, save, send, approvalMs = 300000, label = 'Codex', onFinish = async()=>{}}) {
@@ -66,11 +66,12 @@ export class Controller {
     }
     if (isConversationMutation(text)) {
       if(this.active)return this.say('任务正在执行，请完成或取消后再管理会话。');
-      const [,command,value='']=text.match(/^\/(新会话|切换会话|删除会话)(?:\s+([\s\S]*))?$/) || [];
+      const [,command,value='']=text.match(/^\/(新会话|切换会话|删除会话|清空会话|清空所有会话)(?:\s+([\s\S]*))?$/) || [];
       const backup=structuredClone(this.state);
       try{
-        const result=changeConversation(this.state,{'新会话':'new','切换会话':'switch','删除会话':'delete'}[command],value.trim());
+        const result=changeConversation(this.state,{'新会话':'new','切换会话':'switch','删除会话':'delete','清空会话':'clear','清空所有会话':'clear'}[command],value.trim());
         await this.save(this.state);if(result.changed){this.loaded=false;this.items.clear();this.clearApprovals(true);}
+        if(command==='清空会话' || command==='清空所有会话')return this.say(`已清空当前项目、当前引擎的 ${backup.conversations.length} 个桥接会话，并创建新会话。\n序号：${ensureConversations(this.state).number}\nID：${result.id}\n项目文件与引擎本机历史保留，可以直接发送新任务。`);
         return this.say(command==='删除会话'?`已删除桥接会话记录 ${value.trim()}。当前会话：${this.state.currentConversation}。项目文件和引擎本机历史未删除。`:`${command==='新会话'?'已创建':'已切换到'}会话「${ensureConversations(this.state).title}」\n序号：${ensureConversations(this.state).number}\nID：${result.id}\n下一条任务使用此上下文。`);
       }catch(e){for(const k of Object.keys(this.state))delete this.state[k];Object.assign(this.state,backup);return this.say('会话操作未完成：'+e.message);}
     }
