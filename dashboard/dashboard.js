@@ -1,14 +1,15 @@
 const $=id=>document.getElementById(id);
+let authRequest=0,authModeEdited=false;
 let token=location.hash.slice(1),user='default',busy=false,epoch=0,context='',authLoaded='',follow=true,logLoading=false;
 if(token){sessionStorage.setItem('wx-agent-token',token);history.replaceState(null,'','/');}else token=sessionStorage.getItem('wx-agent-token') || '';
 async function api(action,extra={}){const r=await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,user,...extra})});const data=await r.json();if(!r.ok || data.error)throw Error(data.error || '请求失败');return data;}
-function invalidate(){epoch++;$('pair-panel').hidden=true;$('pair-qr').hidden=true;$('pair-qr').removeAttribute('src');$('pair-code').value='';authLoaded='';$('auth-save').disabled=true;for(const id of ['auth-url','auth-env','auth-model'])$(id).value='';$('auth-info').textContent='请读取所选用户的认证配置';$('model-results').replaceChildren();$('output').textContent='';$('log-info').textContent='';}
+function invalidate(){epoch++;authRequest++;authModeEdited=false;$('pair-panel').hidden=true;$('pair-qr').hidden=true;$('pair-qr').removeAttribute('src');$('pair-code').value='';authLoaded='';$('auth-save').disabled=true;for(const id of ['auth-url','auth-env','auth-model'])$(id).value='';$('auth-info').textContent='请读取所选用户的认证配置';$('model-results').replaceChildren();$('output').textContent='';$('log-info').textContent='';}
 async function refresh(){
  const selected=user,data=await api('users');if(selected!==user)return;
  $('users').replaceChildren();for(const u of data.users){const b=document.createElement('button');b.className='user'+(u.name===user?' selected':'');b.textContent=u.name+' · '+(u.status?.status==='starting'?'启动或配置中':u.status?'运行中':u.bound?'已停止':'未绑定');b.onclick=()=>act(async()=>{user=u.name;invalidate();await refresh();if($('log-panel').open)await loadLogs();});$('users').append(b);}
  const u=data.users.find(u=>u.name===user);if(!u)return;const s=u.status,next=user+':'+(s?.engine || u.engine);if(context!==next){invalidate();context=next;}
  $('title').textContent=user+' 的工作区';$('engine').value=s?.engine || u.engine;
- $('user-remove').hidden=user==='default' || u.bound!==false;$('user-remove').disabled=!!s;
+ $('user-remove').hidden=user==='default';$('user-remove').disabled=!!s;
  const running=!!s && s.status!=='starting',idle=running && s.task==='空闲';
  $('set-workspace').disabled=$('set-project').disabled=!!s && !idle;
  $('workspace-path').value=s?.workspace || u.workspace || '';$('start').disabled=!!s || u.bound===false;$('pair-start').disabled=!!s || !!u.bound;$('stop').disabled=!idle;
@@ -49,8 +50,19 @@ act(refresh);
 setInterval(()=>{if(!busy && !['INPUT','SELECT'].includes(document.activeElement?.tagName))act(refresh);},10000);
 setInterval(()=>{if($('log-panel').open)void loadLogs();},3000);
 
-async function loadAuth(){const stamp=epoch,selectedEngine=$('auth-engine').value,r=await api('auth-read',{engine:selectedEngine});if(stamp!==epoch||selectedEngine!==$('auth-engine').value)return;$('auth-mode').value=r.auth;$('auth-url').value=r.baseUrl;$('auth-env').value=r.apiKeyEnv;$('auth-model').value=r.model;authLoaded=user+':'+selectedEngine;$('auth-info').textContent=`${selectedEngine} · 环境变量${r.keyPresent?'已设置':'未设置'}（不代表远端认证有效）`;const data=await api('users');if(stamp===epoch)$('auth-save').disabled=!!data.users.find(u=>u.name===user)?.status;}
-$('auth-load').onclick=()=>act(loadAuth);$('auth-engine').onchange=()=>{authLoaded='';$('auth-save').disabled=true;act(loadAuth);};
+async function loadAuth({preserveMode=false}={}){
+ const stamp=epoch,request=++authRequest,selectedEngine=$('auth-engine').value,mode=$('auth-mode').value;
+ const r=await api('auth-read',{engine:selectedEngine,...(preserveMode?{auth:mode}:{})});
+ if(stamp!==epoch||request!==authRequest||selectedEngine!==$('auth-engine').value)return;
+ $('auth-mode').value=r.auth;$('auth-url').value=r.baseUrl;$('auth-env').value=r.apiKeyEnv;$('auth-model').value=r.model;
+ $('auth-url').placeholder='留空沿用：'+r.effectiveBaseUrl;
+ authLoaded=user+':'+selectedEngine;authModeEdited=false;
+ $('auth-info').textContent=`${selectedEngine} · 当前选择：${r.auth==='api'?'API 环境变量':'本机 CLI'} · 已保存：${r.savedAuth==='api'?'API 环境变量':'本机 CLI'}\nAPI 模式地址：${r.effectiveBaseUrl}（${({config:'桥接配置',environment:'环境变量',default:'官方默认'})[r.baseUrlSource]}）\n${r.apiKeyEnv}：${r.keyPresent?'已设置':'未设置'}（来自启动面板时的环境，不代表远端认证有效）${r.effectiveModel?' · 模型配置：'+r.effectiveModel:''}${r.auth!==r.savedAuth?'\n认证方式尚未保存，请停止服务后保存。':''}`;
+ const data=await api('users');if(stamp===epoch&&request===authRequest)$('auth-save').disabled=!!data.users.find(u=>u.name===user)?.status;
+}
+$('auth-load').onclick=()=>act(()=>loadAuth({preserveMode:authModeEdited||authLoaded===user+':'+$('auth-engine').value}));
+$('auth-mode').onchange=()=>{authModeEdited=true;authRequest++;$('auth-info').textContent='认证方式已修改，尚未保存；读取配置会保留此选择。';};
+$('auth-engine').onchange=()=>{authRequest++;authModeEdited=false;authLoaded='';$('auth-save').disabled=true;act(()=>loadAuth());};
 $('auth-save').onclick=()=>act(async()=>{if(authLoaded!==user+':'+$('auth-engine').value)throw Error('请先读取当前认证配置');await api('auth-save',{engine:$('auth-engine').value,auth:$('auth-mode').value,baseUrl:$('auth-url').value,apiKeyEnv:$('auth-env').value,model:$('auth-model').value});invalidate();await refresh();await loadAuth();return '认证已保存，下次启动生效；不同认证配置的会话独立保留';});
 
 const pairingByUser=new Map();let pairLoading=false;
@@ -63,4 +75,4 @@ $('pair-submit').onclick=()=>act(async()=>{const code=$('pair-code').value;$('pa
 $('pair-cancel').onclick=()=>act(async()=>{const stamp=epoch,r=await api('pairing-cancel',{operationId:pairingByUser.get(user)});if(stamp===epoch){showPair(r);pairingByUser.delete(user);await refresh();}});
 setInterval(()=>{void pollPair();},1000);
 
-$('user-remove').onclick=()=>{const selected=user;if(!confirm(`删除未绑定用户 ${selected}？用户将从列表移除，工作文件归档保留。`))return;act(async()=>{const r=await api('user-remove',{confirm:true});pairingByUser.delete(selected);user='default';invalidate();await refresh();return '用户已删除，文件归档于：'+r.archive;});};
+$('user-remove').onclick=()=>{const selected=user;if(!confirm(`删除已停止用户 ${selected}？用户将从列表移除，微信绑定、会话及工作文件归档保留。`))return;act(async()=>{const r=await api('user-remove',{confirm:true});pairingByUser.delete(selected);user='default';invalidate();await refresh();return '用户已删除，文件归档于：'+r.archive;});};

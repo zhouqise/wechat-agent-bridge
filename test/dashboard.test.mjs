@@ -41,7 +41,7 @@ test('面板认证字段白名单、停止态保存及不返回环境密钥',asy
  const request=body=>fetch(d.origin+'/api',{method:'POST',headers:{Origin:d.origin,Authorization:'Bearer '+d.token,'Content-Type':'application/json'},body:JSON.stringify(body)});
  const body={action:'auth-save',engine:'claude',auth:'local',baseUrl:'https://example.com',apiKeyEnv:'MY_CLAUDE_KEY',model:'default'};
  assert.equal((await (await request(body)).json()).applied,'next-start');assert.equal((await request({...body,apiKey:'NEVER_STORE'})).status,400);assert.ok(!(await fs.readFile(p.config,'utf8')).includes('NEVER_STORE'));
- const view=await (await request({action:'auth-read',engine:'claude'})).json();assert.equal(view.apiKeyEnv,'MY_CLAUDE_KEY');assert.deepEqual(Object.keys(view).sort(),['engine','auth','baseUrl','apiKeyEnv','keyPresent','model'].sort());
+ const view=await (await request({action:'auth-read',engine:'claude'})).json();assert.equal(view.apiKeyEnv,'MY_CLAUDE_KEY');assert.deepEqual(Object.keys(view).sort(),['engine','auth','savedAuth','baseUrl','effectiveBaseUrl','baseUrlSource','apiKeyEnv','keyPresent','model','effectiveModel'].sort());
  const ipc=await serve(p,()=>({task:'空闲',engine:'codex'}),()=>{});try{assert.equal((await request(body)).status,400);}finally{await ipc.close();}
 });
 test('页面新增用户、扫码绑定接口与同名保护',async t=>{
@@ -55,15 +55,15 @@ test('页面新增用户、扫码绑定接口与同名保护',async t=>{
  const users=await (await request({action:'users'})).json();assert.equal(users.users.find(u=>u.name==='alice').bound,true);
 });
 
-test('页面删除仅限未绑定新增用户：确认、运行锁、绑定保护及文件归档',async t=>{
+test('页面删除已停止新增用户：确认、运行锁及绑定文件归档',async t=>{
  const base=await fs.mkdtemp(path.join(os.tmpdir(),'wxpanelremove-'));const d=await startDashboard({base});t.after(async()=>{await d.close();await fs.rm(base,{recursive:true,force:true});});
  const request=body=>fetch(d.origin+'/api',{method:'POST',headers:{Origin:d.origin,Authorization:'Bearer '+d.token,'Content-Type':'application/json'},body:JSON.stringify(body)});
  await request({action:'user-create',value:'alice'});const p=paths({WX_CODEX_HOME:base,WX_AGENT_USER:'alice'});await fs.writeFile(path.join(p.workspace,'keep.txt'),'keep');
  assert.equal((await request({action:'user-remove',user:'alice'})).status,400);
  assert.equal((await request({action:'user-remove',user:'default',confirm:true})).status,400);
  await acquireLock(p);try{assert.equal((await request({action:'user-remove',user:'alice',confirm:true})).status,400);}finally{await releaseLock(p);}
- await writeJSON(p.session,{owner:'bound'});assert.equal((await request({action:'user-remove',user:'alice',confirm:true})).status,400);
- await fs.rm(p.session);const removed=await (await request({action:'user-remove',user:'alice',confirm:true})).json();assert.equal(removed.ok,true);assert.equal(await fs.readFile(path.join(removed.archive,'workspace','keep.txt'),'utf8'),'keep');assert.equal(await fs.stat(path.join(removed.archive,'running.lock')).then(()=>true,()=>false),false);
+ await writeJSON(p.session,{owner:'bound'});
+ const removed=await (await request({action:'user-remove',user:'alice',confirm:true})).json();assert.equal(removed.ok,true);assert.equal(JSON.parse(await fs.readFile(path.join(removed.archive,'session.json'),'utf8')).owner,'bound');assert.equal(await fs.readFile(path.join(removed.archive,'workspace','keep.txt'),'utf8'),'keep');assert.equal(await fs.stat(path.join(removed.archive,'running.lock')).then(()=>true,()=>false),false);
  const users=await (await request({action:'users'})).json();assert.deepEqual(users.users.map(u=>u.name),['default']);assert.equal((await request({action:'user-remove',user:'alice',confirm:true})).status,400);
  assert.equal((await request({action:'user-create',value:'alice'})).status,200);
 });

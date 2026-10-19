@@ -8,7 +8,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import path from 'node:path';
 import {paths,readJSON,privateDir,acquireLock,releaseLock} from './paths.mjs';
-import {userNames,requireUser,profileState,provisionUser,removeUnboundUser} from './users.mjs';
+import {userNames,requireUser,profileState,provisionUser,removeStoppedUser} from './users.mjs';
 import {readLogs,clearLogs} from './logs.mjs';
 import {workspace} from './workspace.mjs';
 import {projectList} from './projects.mjs';
@@ -39,7 +39,7 @@ export async function startDashboard({base=paths().baseDir,port=0,pairingOptions
         const users=await Promise.all(names.map(async name=>{const p=await resolveUser(name),status=await profileState(p),config=await readJSON(p.config,{});return {name,status,bound:!!(await readJSON(p.session,{})).owner,engine:config.engine || 'codex',projectEntries:Object.entries(projectList(config,p.workspace)).map(([name,path])=>({name,path})),workspace:status?.workspace || projectList(config,p.workspace)[config.currentProject || 'default'] || p.workspace};}));return reply(200,{users});
       }
       if(action==='user-create'){await privateDir(base);const guard={lock:path.join(base,'users.lock')};await acquireLock(guard);try{const created=await provisionUser(base,value);return reply(200,{ok:true,user:value,workspace:created.workspace,bound:false});}finally{await releaseLock(guard);}}
-      if(action==='user-remove'){if(confirm!==true)throw Error('请确认删除未绑定用户');const archive=await removeUnboundUser(base,user);return reply(200,{ok:true,archive});}
+      if(action==='user-remove'){if(confirm!==true)throw Error('请确认删除已停止用户');const archive=await removeStoppedUser(base,user);return reply(200,{ok:true,archive});}
       const p=await resolveUser(user);
       if(action==='pairing-start')return reply(200,await pairing.begin(user));
       if(action==='pairing-status')return reply(200,pairing.status(user,body.operationId));
@@ -52,7 +52,7 @@ export async function startDashboard({base=paths().baseDir,port=0,pairingOptions
         return reply(200,await control(p,'admin',{action:operation,value}));
       }
       if(action==='model')return reply(200,await saveModel(p,value));
-      if(action==='auth-read')return reply(200,authView(await readJSON(p.config,{}),body.engine));
+      if(action==='auth-read')return reply(200,authView(await readJSON(p.config,{}),body.engine,process.env,body.auth));
       if(action==='auth-save'){const {action:_,user:__,...input}=body;return reply(200,await saveAuth(p,input));}
       if(action==='models')return reply(200,await control(p,'models'));
       if(action==='stop')return reply(200,await control(p,'stop-if-idle'));

@@ -45,3 +45,8 @@ test('旧会话无 workspace 时按配置真实路径迁移，两种引擎均保
  const loaded=JSON.parse(JSON.stringify(state));assert.equal(authSession(loaded,'codex',real,config).threadId,'saved-codex');
  const fallback={codex:{threadId:'fallback'}};assert.equal(authSession(fallback,'codex',real,{}).threadId,'fallback');
 });
+
+test('读取选中的API模式及实际环境地址，不修改已保存认证或返回密钥',()=>{
+ const c={claudeAuth:'local',claudeModel:'opus'},env={ANTHROPIC_BASE_URL:'https://proxy.example/',ANTHROPIC_API_KEY:'secret'};
+ const r=authView(c,'claude',env,'api');assert.equal(r.auth,'api');assert.equal(r.savedAuth,'local');assert.equal(r.effectiveBaseUrl,'https://proxy.example');assert.equal(r.baseUrlSource,'environment');assert.equal(r.keyPresent,true);assert.equal(c.claudeAuth,'local');assert.ok(!JSON.stringify(r).includes('secret'));assert.throws(()=>authView(c,'claude',env,'wrong'));
+});

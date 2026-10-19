@@ -47,7 +47,7 @@ wx-agent user add teammate     # 创建独立工作区，扫码后自动启动
 wx-agent dashboard            # 浏览器集中管理所有用户
 ```
 
-也可直接在面板点击「新增用户并绑定」，让对方扫码，绑定后自动启动。未绑定的新增用户可在页面删除，文件归档保留；正在扫码时先取消绑定。选择用户即可查看其状态、队列和会话，分别启动或空闲时停止服务；也可用 `wx-agent user list` 查看所有用户。
+也可直接在面板点击「新增用户并绑定」，让对方扫码，绑定后自动启动。已停止的新增用户（包括已绑定用户）可在页面删除，绑定、会话和文件归档保留；正在扫码时先取消绑定。选择用户即可查看其状态、队列和会话，分别启动或空闲时停止服务；也可用 `wx-agent user list` 查看所有用户。
 
 原有用户为 `default`，不带 `--user` 的命令继续管理默认用户。工作区分离属于应用层管理，**不是操作系统安全隔离**；获批命令仍以本机用户权限执行。详见[多用户使用指南](docs/operations.md#多用户同时运行)。
 
@@ -77,7 +77,7 @@ wx-agent dashboard            # 浏览器集中管理所有用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.22.1/wx-codex-bridge-0.22.1.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.22.2/wx-codex-bridge-0.22.2.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -85,7 +85,7 @@ wx-agent start
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.22.1/wx-codex-bridge-0.22.1.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.22.2/wx-codex-bridge-0.22.2.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 ```

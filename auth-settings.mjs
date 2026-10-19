@@ -4,8 +4,13 @@ import {codexSettings} from './codex-config.mjs';
 import {modelConfig} from './models.mjs';
 import {privateDir,readJSON,writeJSON,acquireLock,releaseLock} from './paths.mjs';
 import {control} from './service.mjs';
-export function authView(config,engine,env=process.env){
- const s=engineAuth(config,engine,env);return {engine,auth:s.auth,baseUrl:config[engine+'BaseUrl'] || '',apiKeyEnv:s.apiKeyEnv,keyPresent:!!env[s.apiKeyEnv]?.trim(),model:config[engine+'Model'] || ''};
+export function authView(config,engine,env=process.env,auth){
+ if(auth!==undefined&&!['local','api'].includes(auth))throw Error('认证方式只能是 local 或 api');
+ const savedAuth=config[engine+'Auth'] || 'local',view=auth===undefined?config:{...config,[engine+'Auth']:auth},s=engineAuth(view,engine,env);
+ return {engine,auth:s.auth,savedAuth,baseUrl:config[engine+'BaseUrl'] || '',effectiveBaseUrl:s.baseUrl,
+  baseUrlSource:config[engine+'BaseUrl']?'config':env[engine==='codex'?'OPENAI_BASE_URL':'ANTHROPIC_BASE_URL']?'environment':'default',
+  apiKeyEnv:s.apiKeyEnv,keyPresent:!!env[s.apiKeyEnv]?.trim(),model:config[engine+'Model'] || '',
+  effectiveModel:config[engine+'Model'] || (s.auth==='api'?env[engine==='codex'?'OPENAI_MODEL':'ANTHROPIC_MODEL']:'') || ''};
 }
 export function updateAuthConfig(config,input,env=process.env){
  const allowed=['engine','auth','baseUrl','apiKeyEnv','model'];if(!input||Object.keys(input).some(k=>!allowed.includes(k)))throw Error('认证表单只接受方式、地址、变量名和模型，不接受密钥');
