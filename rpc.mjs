@@ -1,3 +1,4 @@
+import {restoreEngineDefault} from './models.mjs';
 import {codexSettings} from './codex-config.mjs';
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
@@ -7,7 +8,7 @@ import {codexCommand,stopChild} from './platform.mjs';
 export class CodexRPC extends EventEmitter {
   constructor({cwd, config = {}, binary, spawnFn = spawn, proxy = process.env.BRIDGE_CODEX_PROXY} = {}) {
     super(); this.next = 1; this.pending = new Map(); this.closed = false;
-    this.settings=codexSettings(config);
+    this.settings=codexSettings(config);this.restoreDefault=config.codexModel==='';this.cwd=cwd;
     const env = {...process.env};
     if (proxy) {
       const u = new URL(proxy);
@@ -61,8 +62,9 @@ export class CodexRPC extends EventEmitter {
   respond(id, result) {this.write({id, result});}
   reject(id) {this.write({id, error: {code: -32601, message: 'Unsupported client request'}});}
   async initialize() {
-    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.21.0'}});
+    await this.request('initialize', {clientInfo: {name:'weixin_codex_bridge', title:'微信 Codex 桥接', version:'0.22.0'}});
     this.write({method:'initialized', params:{}});
+    if(this.restoreDefault)await restoreEngineDefault(this,this.cwd);
   }
   close() {stopChild(this.child); this.fail(); this.lines.close();}
 }

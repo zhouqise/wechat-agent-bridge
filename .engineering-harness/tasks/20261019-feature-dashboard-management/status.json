@@ -1,0 +1,462 @@
+{
+  "schemaVersion": 4,
+  "artifactMode": "staged",
+  "lifecycleVersion": 4,
+  "taskId": "20261019-feature-dashboard-management",
+  "type": "feature",
+  "phase": "handed-off",
+  "outcome": "completed",
+  "requirementState": "baseline-confirmed",
+  "ownershipState": "confirmed",
+  "updatedAt": "2026-10-19T12:10:43Z",
+  "blockers": [],
+  "designReview": {
+    "decision": "passed",
+    "reviewerType": "subagent",
+    "evidence": "design-review.md",
+    "reviewRecordedAt": "2026-10-19T11:38:54Z"
+  },
+  "designConfirmation": {
+    "confirmedBy": "user",
+    "evidence": "design.md",
+    "confirmedAt": "2026-10-19T11:38:54Z"
+  },
+  "designRevision": 1,
+  "designRevisions": [],
+  "planningConfirmation": {
+    "executionMode": "sequential",
+    "agentCapability": "subagents",
+    "evidence": "implementation-plan.md",
+    "confirmedBy": "user",
+    "confirmedAt": "2026-10-19T11:38:54Z",
+    "commitCheckpoint": "task"
+  },
+  "planItems": [
+    {
+      "id": "P-01",
+      "title": "日志、模型和目录",
+      "scope": [
+        "logs.mjs",
+        "models.mjs",
+        "service.mjs",
+        "cli.mjs",
+        "dashboard.mjs",
+        "dashboard/",
+        "test/"
+      ],
+      "status": "verified",
+      "evidence": "evidence.md",
+      "updatedAt": "2026-10-19T11:44:15Z",
+      "review": {
+        "decision": "passed",
+        "severity": "none",
+        "reviewerType": "subagent",
+        "evidence": "evidence.md",
+        "diffSnapshot": "sha256:89d15912bf55b4a5f97b889eb6b2771fe2502235d7874905327b78432a3a3957",
+        "baseRevision": "0ed32dc1dac1f51acf5f07c7b4df4d447663f6f1",
+        "headRevision": "working-tree",
+        "allowedPaths": [
+          "logs.mjs",
+          "models.mjs",
+          "service.mjs",
+          "cli.mjs",
+          "dashboard.mjs",
+          "dashboard/",
+          "test/"
+        ],
+        "reviewRecordedAt": "2026-10-19T11:44:15Z"
+      },
+      "checkpoint": null
+    },
+    {
+      "id": "P-02",
+      "title": "认证配置和会话隔离",
+      "scope": [
+        "auth-settings.mjs",
+        "auth-sessions.mjs",
+        "engines.mjs",
+        "claude.mjs",
+        "codex-config.mjs",
+        "models.mjs",
+        "cli.mjs",
+        "wx-agent.mjs",
+        "setup-engines.mjs",
+        "users.mjs",
+        "dashboard.mjs",
+        "dashboard/",
+        "test/",
+        "auth-config.mjs",
+        "service.mjs"
+      ],
+      "status": "verified",
+      "evidence": "evidence.md",
+      "updatedAt": "2026-10-19T11:53:38Z",
+      "review": {
+        "decision": "passed",
+        "severity": "none",
+        "reviewerType": "subagent",
+        "evidence": "evidence.md",
+        "diffSnapshot": "sha256:021daa82cbae8ef38b0f6c81819f4d4675a25e3f616196f5c0d05924d4bc6a25",
+        "baseRevision": "0ed32dc1dac1f51acf5f07c7b4df4d447663f6f1",
+        "headRevision": "working-tree",
+        "allowedPaths": [
+          "auth-settings.mjs",
+          "auth-sessions.mjs",
+          "engines.mjs",
+          "claude.mjs",
+          "codex-config.mjs",
+          "models.mjs",
+          "cli.mjs",
+          "wx-agent.mjs",
+          "setup-engines.mjs",
+          "users.mjs",
+          "dashboard.mjs",
+          "dashboard/",
+          "test/",
+          "auth-config.mjs",
+          "service.mjs"
+        ],
+        "reviewRecordedAt": "2026-10-19T11:53:38Z"
+      },
+      "checkpoint": null
+    },
+    {
+      "id": "P-03",
+      "title": "页面创建用户及扫码绑定",
+      "scope": [
+        "pairing.mjs",
+        "pairing-manager.mjs",
+        "cli.mjs",
+        "wx-agent.mjs",
+        "dashboard.mjs",
+        "dashboard/",
+        "test/"
+      ],
+      "status": "verified",
+      "evidence": "evidence.md",
+      "updatedAt": "2026-10-19T12:01:57Z",
+      "review": {
+        "decision": "passed",
+        "severity": "none",
+        "reviewerType": "subagent",
+        "evidence": "evidence.md",
+        "diffSnapshot": "sha256:9c6d0ba2e68370eb97edd1fa391e43efe2d7b33998904249115febece1b6feb3",
+        "baseRevision": "0ed32dc1dac1f51acf5f07c7b4df4d447663f6f1",
+        "headRevision": "working-tree",
+        "allowedPaths": [
+          "pairing.mjs",
+          "pairing-manager.mjs",
+          "cli.mjs",
+          "wx-agent.mjs",
+          "dashboard.mjs",
+          "dashboard/",
+          "test/"
+        ],
+        "reviewRecordedAt": "2026-10-19T12:01:57Z"
+      },
+      "checkpoint": null
+    },
+    {
+      "id": "P-04",
+      "title": "文档打包与发布验证",
+      "scope": [
+        "README.md",
+        "docs/",
+        "SECURITY.md",
+        "CHANGELOG.md",
+        "package.json",
+        "package-lock.json",
+        "rpc.mjs",
+        "wx-agent.mjs",
+        ".github/workflows/test.yml",
+        "test/",
+        ".engineering-harness/",
+        "auth-sessions.mjs",
+        "dashboard/"
+      ],
+      "status": "verified",
+      "evidence": "evidence.md",
+      "updatedAt": "2026-10-19T12:10:43Z",
+      "review": {
+        "decision": "passed",
+        "severity": "none",
+        "reviewerType": "subagent",
+        "evidence": "evidence.md",
+        "diffSnapshot": "sha256:5f6428298dfb13a73f0f7dc5989f112b6ebdc3b07cde9f311caa1b760bc2ad08",
+        "baseRevision": "0ed32dc1dac1f51acf5f07c7b4df4d447663f6f1",
+        "headRevision": "working-tree",
+        "allowedPaths": [
+          "README.md",
+          "docs/",
+          "SECURITY.md",
+          "CHANGELOG.md",
+          "package.json",
+          "package-lock.json",
+          "rpc.mjs",
+          "wx-agent.mjs",
+          ".github/workflows/test.yml",
+          "test/",
+          ".engineering-harness/",
+          "auth-sessions.mjs",
+          "dashboard/"
+        ],
+        "reviewRecordedAt": "2026-10-19T12:10:43Z"
+      },
+      "checkpoint": null
+    }
+  ],
+  "planningRevision": 1,
+  "planningRevisions": [],
+  "preferences": {
+    "resolvedAt": "2026-10-19T12:10:43Z",
+    "effective": {
+      "schemaVersion": 3,
+      "language": "zh-CN",
+      "responseDetail": "balanced",
+      "diagramFormat": "auto",
+      "executionModeDefault": "ask",
+      "commitCheckpointDefault": "ask"
+    },
+    "sources": {
+      "language": "user",
+      "responseDetail": "user",
+      "diagramFormat": "user",
+      "executionModeDefault": "user",
+      "commitCheckpointDefault": "user"
+    }
+  },
+  "history": [
+    {
+      "phase": "intake",
+      "outcome": "active",
+      "at": "2026-10-19T10:24:43Z",
+      "evidence": "requirement.md#source"
+    },
+    {
+      "phase": "intake",
+      "outcome": "active",
+      "at": "2026-10-19T10:25:27Z",
+      "evidence": "requirement.md"
+    },
+    {
+      "phase": "context",
+      "outcome": "active",
+      "at": "2026-10-19T10:25:27Z",
+      "evidence": "context.md"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T11:38:54Z",
+      "evidence": "design.md"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T11:38:54Z",
+      "evidence": "implementation-plan.md",
+      "reason": "plan-item-registered",
+      "itemId": "P-01"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T11:38:54Z",
+      "evidence": "implementation-plan.md",
+      "reason": "plan-item-registered",
+      "itemId": "P-02"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T11:38:54Z",
+      "evidence": "implementation-plan.md",
+      "reason": "plan-item-registered",
+      "itemId": "P-03"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T11:38:54Z",
+      "evidence": "implementation-plan.md",
+      "reason": "plan-item-registered",
+      "itemId": "P-04"
+    },
+    {
+      "phase": "planned",
+      "outcome": "active",
+      "at": "2026-10-19T11:38:54Z",
+      "evidence": "implementation-plan.md"
+    },
+    {
+      "phase": "planned",
+      "outcome": "active",
+      "at": "2026-10-19T11:38:54Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-01",
+      "itemStatus": "red"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:38:54Z",
+      "evidence": "evidence.md"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:44:15Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-01",
+      "itemStatus": "green"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:44:15Z",
+      "evidence": "evidence.md",
+      "reason": "review-passed",
+      "itemId": "P-01"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:44:15Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-01",
+      "itemStatus": "verified"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:44:15Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-02",
+      "itemStatus": "red"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:53:38Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-02",
+      "itemStatus": "green"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:53:38Z",
+      "evidence": "evidence.md",
+      "reason": "review-passed",
+      "itemId": "P-02"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:53:38Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-02",
+      "itemStatus": "verified"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T11:53:38Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-03",
+      "itemStatus": "red"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T12:01:56Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-03",
+      "itemStatus": "green"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T12:01:57Z",
+      "evidence": "evidence.md",
+      "reason": "review-passed",
+      "itemId": "P-03"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T12:01:57Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-03",
+      "itemStatus": "verified"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T12:02:03Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-04",
+      "itemStatus": "red"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T12:10:43Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-04",
+      "itemStatus": "green"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T12:10:43Z",
+      "evidence": "evidence.md",
+      "reason": "review-passed",
+      "itemId": "P-04"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T12:10:43Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-04",
+      "itemStatus": "verified"
+    },
+    {
+      "phase": "green",
+      "outcome": "active",
+      "at": "2026-10-19T12:10:43Z",
+      "evidence": "evidence.md"
+    },
+    {
+      "phase": "verified",
+      "outcome": "active",
+      "at": "2026-10-19T12:10:43Z",
+      "evidence": "evidence.md"
+    },
+    {
+      "phase": "handed-off",
+      "outcome": "active",
+      "at": "2026-10-19T12:10:43Z",
+      "evidence": "handoff.md"
+    },
+    {
+      "phase": "handed-off",
+      "outcome": "completed",
+      "at": "2026-10-19T12:10:43Z",
+      "evidence": "handoff.md"
+    }
+  ]
+}

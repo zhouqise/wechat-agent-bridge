@@ -1,3 +1,5 @@
+import {pairWechat} from './pairing.mjs';
+import {storeAuthSession} from './auth-sessions.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {paths, privateDir, acquireLock, releaseLock, readJSON, writeJSON,alive} from './paths.mjs';
@@ -7,7 +9,7 @@ import QRCode from 'qrcode';
 import {createHash,randomUUID} from 'node:crypto';
 import {BASE, api, trustedBase, acceptBatch} from './bridge.mjs';
 import {engineName,makeController} from './engines.mjs';
-import {modelListText,modelInfo,prepareModel} from './models.mjs';
+import {modelListText,modelListResult,restoreEngineDefault,modelInfo,prepareModel} from './models.mjs';
 import {officeInputs,workspaceDir,FILE_EXTS} from './office.mjs';
 import {sendOfficeFile} from './file-send.mjs';
 import {webInputs} from './web.mjs';
@@ -34,7 +36,8 @@ let lastReceivedAt = null;
 let stopping = false;
 let saving = Promise.resolve();
 let recoveryTimer;
-let workspaceTransition,cleaning;
+let workspaceTransition,cleaning,loginOperation;
+const loginAbort=new AbortController();
 const health={wechat:'connecting',failures:0,nextRetryAt:null,engineRetries:0};
 async function save(state) {
   const data = JSON.stringify(state);
@@ -51,6 +54,7 @@ function clean() {
   if(cleaning)return cleaning;
   stopping=true;clearInterval(recoveryTimer);tasks?.close();
   cleaning=(async()=>{
+    loginAbort.abort();await loginOperation?.catch(()=>{});
     await workspaceTransition?.wait();
     const preparing=controller?.active?.abort?controller.starting:null;
     controller?.close();await preparing;await saving;await server?.close();
@@ -60,55 +64,11 @@ function clean() {
 }
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {void clean().finally(() => process.exit(0));});
 
-async function login() {
-  const qr = await api(BASE, 'ilink/bot/get_bot_qrcode?bot_type=3', {local_token_list: []});
-  if (typeof qr.qrcode !== 'string' || typeof qr.qrcode_img_content !== 'string') {
-    throw new Error('服务未返回有效二维码，当前账号或接口可能暂不可用');
-  }
-  await QRCode.toFile(qrPath, qr.qrcode_img_content, {width: 480, margin: 3});
-  await fs.chmod(qrPath, 0o600);
-  console.log(await QRCode.toString(qr.qrcode_img_content,{type:'terminal',small:true}));
-  console.log(`请用手机微信扫描二维码；图片备份：${qrPath}`);
-  console.log('扫码后请在手机上确认连接。二维码最长等待 5 分钟。');
-  let base = BASE, code;
-  const until = Date.now() + 300000;
-  let failures = 0;
-  while (Date.now() < until) {
-    let result;
-    try {
-      result = await api(base, `ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qr.qrcode)}${code ? `&verify_code=${encodeURIComponent(code)}` : ''}`);
-      failures = 0;
-    } catch {
-      if (++failures >= 4) throw new Error('登录轮询连续失败，请重新启动');
-      await sleep(2000); continue;
-    }
-    switch (result.status) {
-      case 'confirmed': {
-        if (!result.bot_token || !result.ilink_user_id || !result.ilink_bot_id) throw new Error('缺少绑定者身份或凭证，停止连接');
-        const state = {token: result.bot_token, owner: result.ilink_user_id, bot: result.ilink_bot_id,
-          base: trustedBase(result.baseurl || base), cursor: '', seen: []};
-        await save(state);
-        await fs.rm(qrPath, {force: true});
-        console.log('扫码绑定成功，凭证已保存在本机。');
-        return state;
-      }
-      case 'scaned_but_redirect':
-        base = trustedBase(`https://${result.redirect_host}`); break;
-      case 'need_verifycode': {
-        if (!process.stdin.isTTY) throw new Error('需要手机配对码：请在本机终端运行 wx-agent login 后输入，不要在聊天中发送验证码');
-        const rl = createInterface({input: process.stdin, output: process.stdout});
-        code = (await rl.question('请输入手机显示的配对数字：')).trim(); rl.close(); break;
-      }
-      case 'scaned': code = undefined; break;
-      case 'expired': throw new Error('二维码已过期，请重新启动以生成新二维码');
-      case 'verify_code_blocked': throw new Error('配对验证被限制，请稍后重试');
-      case 'binded_redirect': throw new Error('服务提示已有绑定，但本程序没有可用凭证；请在微信检查已有连接');
-      case 'wait': break;
-      default: throw new Error('遇到未支持的登录状态，已停止');
-    }
-    await sleep(1000);
-  }
-  throw new Error('扫码等待超时，请重新启动');
+function login() {
+ loginOperation=pairWechat({signal:loginAbort.signal,commit:save,
+  onQr:async content=>{await QRCode.toFile(qrPath,content,{width:480,margin:3});await fs.chmod(qrPath,0o600);console.log(await QRCode.toString(content,{type:'terminal',small:true}));console.log(`请用手机微信扫描并确认；二维码备份：${qrPath}（最长等待 5 分钟）`);},
+  getCode:async signal=>{if(!process.stdin.isTTY)throw Error('需要手机配对码，请在本机终端运行 wx-agent login');const rl=createInterface({input:process.stdin,output:process.stdout});try{return (await rl.question('请输入手机显示的配对数字：',{signal})).trim();}finally{rl.close();}}
+ });return loginOperation;
 }
 
 async function main() {
@@ -171,6 +131,9 @@ async function main() {
       changing=true;
       try {
         const change=prepareModel(config,engine,value);
+        if(engine==='codex' && !change.config.codexModel && config.codexModel){
+          await workspaceTransition.run({modelConfig:change.config});return modelInfo(config,engine);
+        }
         await writeJSON(p.config,change.config);
         change.apply(controller);config=change.config;
         return modelInfo(config,engine);
@@ -180,22 +143,24 @@ async function main() {
     workspaceTransition=new WorkspaceTransition({
       isStopping:()=>stopping,
       prepare:async value=>{
-        const next=await prepareWorkspace(config,p.workspace,value);
-        if(next.cwd===cwd)return {unchanged:true,result:{ok:true,workspace:cwd,project:currentProject,conversation:controller.state.currentConversation,applied:'live'}};
+        const modelChange=typeof value==='object' && value?.modelConfig;
+        const next=modelChange?{cwd,project:currentProject,config:modelChange,resetModel:true}:await prepareWorkspace(config,p.workspace,value);
+        if(!modelChange && next.cwd===cwd)return {unchanged:true,result:{ok:true,workspace:cwd,project:currentProject,conversation:controller.state.currentConversation,applied:'live'}};
         next.draft=structuredClone(state);next.key=createHash('sha256').update(next.cwd).digest('hex');return next;
       },
       create:next=>makeController({engine,cwd:next.cwd,config:next.config,state:next.draft,
         save:async()=>{if(next.published)await save(state);},send,
         onFinish:async status=>{if(status==='completed' && !stopping)await returnFiles({cwd,before:beforeFiles,say:text=>controller.say(text),send:name=>sendOfficeFile({cwd,name,state,contextToken:taskToken})});}}),
       persist:async(next,candidate)=>{
+        if(next.resetModel){await restoreEngineDefault(candidate.rpc,next.cwd);return;}
         // Merge only the candidate's engine slot. Keep live cursor/deduplication
         // and the task queue object: the receiver can still save state meanwhile.
-        state.projectSessions ||= {};
-        state.projectSessions[next.key]={...state.projectSessions[next.key],[engine]:candidate.state};
+        storeAuthSession(state,engine,next.cwd,next.config,candidate.state);
         await save(state);
       },
       commit:next=>writeJSON(p.config,next.config),
       publish:(next,candidate)=>{
+        if(next.resetModel)storeAuthSession(state,engine,next.cwd,next.config,candidate.state);
         const previous=controller;controller=candidate;config=next.config;cwd=next.cwd;currentProject=next.project;
         state[engine]=candidate.state;next.published=true;
         try{previous.close();}catch{console.log('旧引擎连接清理异常，请检查后台进程。');}
@@ -233,11 +198,11 @@ async function main() {
     changing=true;
     void (async()=>{try{await controller.starting;await controller.queue;if(stopping)return;await selectEngine(engine);health.engineRetries=0;health.engineRetryAt=null;}catch{health.engineRetries++;health.engineRetryAt=Date.now()+Math.min(60000,2000*2**Math.min(health.engineRetries,5));}finally{changing=false;}})();
   },1000);recoveryTimer.unref();
-  server = await serve(p, () => ({pid:process.pid,startedAt,health:{...health},...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,project:currentProject,conversation:controller?.state.currentConversation,queued:tasks?.pending.length || 0,task:changing?'连接或配置变更中':controller?.active?(controller.approvals.size?'等待确认':'执行中'):(tasks?.busy?'排队中':'空闲')}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc),async request=>{
+  server = await serve(p, () => ({pid:process.pid,startedAt,health:{...health},...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,project:currentProject,conversation:controller?.state.currentConversation,queued:tasks?.pending.length || 0,task:changing?'连接或配置变更中':controller?.active?(controller.approvals.size?'等待确认':'执行中'):(tasks?.busy?'排队中':'空闲')}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListResult(config,engine,controller?.rpc),async request=>{
     if(echo)throw Error('测试模式不支持管理');
     const {action,value=''}=request;
     if(action==='workspace')return selectWorkspace(value);
-    if(action==='inspect')return {workspace:cwd,current:controller.state.currentConversation,conversations:controller.state.conversations.map(({id,number,title,updatedAt})=>({id,number,title,updatedAt})),queue:tasks.pending.map(({id,text})=>({id,title:text.slice(0,80)})),active:tasks.active?{id:tasks.active.id,stage:controller.active?.stage}:null,projects:Object.keys(projectList(config,p.workspace)),notifications:config.notifications || 'quiet'};
+    if(action==='inspect')return {workspace:cwd,current:controller.state.currentConversation,conversations:controller.state.conversations.map(({id,number,title,updatedAt})=>({id,number,title,updatedAt})),queue:tasks.pending.map(({id,text})=>({id,title:text.slice(0,80)})),active:tasks.active?{id:tasks.active.id,stage:controller.active?.stage}:null,projects:Object.keys(projectList(config,p.workspace)),projectEntries:Object.entries(projectList(config,p.workspace)).map(([name,path])=>({name,path})),notifications:config.notifications || 'quiet'};
     if(changing || tasks.busy || controller.active)throw Error('请等待任务完成或在微信取消并清空队列后操作');
     if(typeof value!=='string' || value.length>100)throw Error('参数无效');
     changing=true;

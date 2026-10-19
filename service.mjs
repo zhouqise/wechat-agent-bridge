@@ -7,7 +7,7 @@ export async function control(p,command='status',params={}) {
   const token=(await readJSON(p.controlToken,{})).token;
   return new Promise((resolve,reject)=>{
     const socket=net.createConnection(p.socket);socket.setEncoding('utf8');let text='';
-    const timer=setTimeout(()=>{socket.destroy();reject(new Error('管理接口超时'));},['models','admin'].includes(command)?65000:2000);
+    const timer=setTimeout(()=>{socket.destroy();reject(new Error('管理接口超时'));},['models','admin','model'].includes(command)?65000:2000);
     socket.on('connect',()=>socket.write(JSON.stringify({...params,command,token})+'\n'));
     socket.on('data',buf=>{
       text+=buf.toString();
@@ -45,9 +45,10 @@ export async function serve(p,status,stop,setModel,listModels,admin) {
       }
       else if(command==='models' && listModels) {
         socket.setTimeout(12000);
-        Promise.resolve().then(listModels).then(text=>socket.end(JSON.stringify({text})+'\n'),()=>socket.end('{"error":"无法获取模型目录"}\n'));
+        Promise.resolve().then(listModels).then(result=>socket.end(JSON.stringify(typeof result==='string'?{text:result}:result)+'\n'),()=>socket.end('{"error":"无法获取模型目录"}\n'));
       }
       else if(command==='model' && setModel) {
+        socket.setTimeout(65000);
         Promise.resolve().then(()=>setModel(request.model)).then(result=>socket.end(JSON.stringify(result)+'\n'),e=>socket.end(JSON.stringify({error:e.message})+'\n'));
       }
       else socket.end('{"error":"unknown command"}\n');

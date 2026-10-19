@@ -1,3 +1,4 @@
+import {claudeEnvironment} from './auth-config.mjs';
 import {EventEmitter} from 'node:events';
 import {randomUUID} from 'node:crypto';
 import {spawn,execFile} from 'node:child_process';
@@ -28,10 +29,10 @@ export async function inWorkspace(cwd,value) {
   return relative==='' || (!relative.startsWith('..'+path.sep) && relative!=='..' && !path.isAbsolute(relative));
 }
 export class ClaudeRPC extends EventEmitter {
-  constructor({cwd,proxy,auth='local',model,binary,spawnFn=spawn,check=exec}={}) {
+  constructor({cwd,proxy,auth='local',config={},model,binary,spawnFn=spawn,check=exec}={}) {
     super();Object.assign(this,{cwd,proxy,auth,model,spawnFn,check});this.pending=new Map();this.closed=false;
     if(!['local','api'].includes(auth))throw new Error('Claude 认证方式只能是 local 或 api');
-    this.env={...process.env};if(binary)this.env.CLAUDE_BINARY=binary;
+    this.env=claudeEnvironment({...config,claudeAuth:auth});if(binary)this.env.CLAUDE_BINARY=binary;
     if(auth==='api'){delete this.env.CLAUDE_CODE_OAUTH_TOKEN;delete this.env.ANTHROPIC_AUTH_TOKEN;}
     if(proxy){const u=new URL(proxy);if(!['http:','https:','socks5:','socks5h:'].includes(u.protocol)||u.username||u.password)throw new Error('Claude 代理地址不合法');
       this.env.HTTPS_PROXY=this.env.HTTP_PROXY=this.env.ALL_PROXY=proxy;

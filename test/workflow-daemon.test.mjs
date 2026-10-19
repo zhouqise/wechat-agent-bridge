@@ -15,6 +15,7 @@ test('完整流程：文件+说明合并、队列串行、结果自动回传、�
 if(process.cwd().includes('fail-initialize'))process.exit(1);
 const send=m=>process.stdout.write(JSON.stringify(m)+'\\n');let thread,turn=0;
 createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.method==='thread/start'||m.method==='thread/resume'){thread=m.params.threadId||'thread-'+path.basename(m.params.cwd);send({id:m.id,result:{thread:{id:thread}}});}
+else if(m.method==='config/read')send({id:m.id,result:{config:{model:'engine-default-model'}}});
 else if(m.method==='turn/start'){const id='turn-'+(++turn),p=m.params;fs.appendFileSync(process.env.FLOW_CALLS,JSON.stringify(p)+'\\n');send({id:m.id,result:{turn:{id}}});if(p.input[0].text==='crash-test'){setTimeout(()=>process.exit(1),50);return;}setTimeout(()=>{fs.mkdirSync(path.join(p.cwd,'wx-agent-output'),{recursive:true});fs.writeFileSync(path.join(p.cwd,'wx-agent-output','result'+turn+'.txt'),'result '+turn);send({method:'item/completed',params:{threadId:thread,turnId:id,item:{id:'msg'+id,type:'agentMessage',phase:'final_answer',text:'done'}}});send({method:'turn/completed',params:{threadId:thread,turn:{id,status:'completed'}}});},2200);}
 else if(m.id!==undefined&&m.method)send({id:m.id,result:{}});});`);
  await fs.writeFile(preload,`import fs from 'node:fs';
@@ -72,7 +73,17 @@ return new Response(JSON.stringify({ret:0,msgs}));};`);
   await fs.rename(path.join(dir,'config.json'),path.join(dir,'config.backup'));await fs.mkdir(path.join(dir,'config.json'));
   assert.ok((await control(p,'admin',{action:'workspace',value:ws})).error);assert.equal((await status()).conversation,beforeFail);assert.equal((await status()).agentReady,true);
   await fs.rmdir(path.join(dir,'config.json'));await fs.rename(path.join(dir,'config.backup'),path.join(dir,'config.json'));
-  await run('restart');assert.equal((await status()).workspace,await fs.realpath(fresh));assert.equal((await status()).conversation,freshConversation);
+  const configPath=path.join(dir,'config.json');await run('model','custom-model');
+  await fs.rename(configPath,configPath+'.saved');await fs.mkdir(configPath);
+  assert.ok((await control(p,'model',{model:'default'})).error);assert.equal((await status()).agentReady,true);
+  await fs.rmdir(configPath);await fs.rename(configPath+'.saved',configPath);
+  await control(p,'admin',{action:'new',value:'after failed reset'});const afterFailedReset=(await status()).conversation;
+  const failedCount=(await calls()).length;await batch([msg('task after failed reset'),msg('/开始')]);await wait(async()=>(await calls()).length===failedCount+1&&(await status()).task==='空闲');
+  await run('restart');assert.equal((await status()).conversation,afterFailedReset);
+  await run('model','default');const resetCount=(await calls()).length;await batch([msg('default model check'),msg('/开始')]);await wait(async()=>(await calls()).length===resetCount+1);assert.equal((await calls()).at(-1).model,'engine-default-model');await wait(async()=>(await status()).task==='空闲');
+  await run('restart');assert.equal((await status()).workspace,await fs.realpath(fresh));assert.equal((await status()).conversation,afterFailedReset);
+  await run('model','custom-model');await run('stop');await run('model','default');await run('start');
+  const stoppedCount=(await calls()).length;await batch([msg('stopped default check'),msg('/开始')]);await wait(async()=>(await calls()).length===stoppedCount+1);assert.equal((await calls()).at(-1).model,'engine-default-model');assert.equal((await calls()).at(-1).threadId,(await calls())[stoppedCount-1].threadId);await wait(async()=>(await status()).task==='空闲');
 
 
 

@@ -16,7 +16,7 @@ export async function provisionUser(base,name) {
   if(await fs.lstat(p.dir).then(()=>true,()=>false))throw Error('该用户已存在，请使用 user login / start，不会覆盖绑定');
   await fs.mkdir(p.dir,{mode:0o700});await privateDir(p.workspace);
   const source=await readJSON(path.join(base,'config.json'),{}),config={workspace:p.workspace};
-  for(const key of ['engine','codexAuth','codexBaseUrl','codexModel','codexApiKeyEnv','codexProxy','claudeAuth','claudeModel','claudeProxy'])if(source[key]!==undefined)config[key]=source[key];
+  for(const key of ['engine','codexAuth','codexBaseUrl','codexModel','codexApiKeyEnv','codexProxy','claudeAuth','claudeBaseUrl','claudeApiKeyEnv','claudeModel','claudeProxy'])if(source[key]!==undefined)config[key]=source[key];
   await writeJSON(p.config,config);return p;
 }
 export async function profileState(p) {

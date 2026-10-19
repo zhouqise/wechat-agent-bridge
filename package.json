@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -54,7 +54,13 @@
     "dashboard.mjs",
     "dashboard",
     "workspace.mjs",
-    "workspace-transition.mjs"
+    "workspace-transition.mjs",
+    "logs.mjs",
+    "auth-config.mjs",
+    "auth-sessions.mjs",
+    "auth-settings.mjs",
+    "pairing.mjs",
+    "pairing-manager.mjs"
   ],
   "os": [
     "darwin",

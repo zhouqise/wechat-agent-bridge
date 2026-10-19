@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import {migrateAuthSessions} from './auth-sessions.mjs';
+import {saveModel} from './auth-settings.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -127,7 +129,7 @@ async function doctor(config=undefined,selectedEngine=undefined) {
   const cwd=config.workspace || p.workspace;await fs.mkdir(cwd,{recursive:true});
   if(engine==='claude') {
     const auth=config.claudeAuth || 'local';
-    const rpc=new ClaudeRPC({cwd,auth,proxy:process.env.BRIDGE_CLAUDE_PROXY || config.claudeProxy});
+    const rpc=new ClaudeRPC({cwd,auth,config,proxy:process.env.BRIDGE_CLAUDE_PROXY || config.claudeProxy});
     await rpc.initialize();rpc.close();
     if(auth==='local') {
       const c=claudeCommand(['--setting-sources','user','auth','status']);
@@ -172,14 +174,11 @@ async function setup() {
   // 修改配置与启动共用锁，阻止配置向导和后台实例同时改变目录。
   await acquireLock(p);
   try {
+    if(JSON.stringify(await readJSON(p.config,{}))!==JSON.stringify(old))throw Error('配置已被其他操作更改，请重新打开配置向导');
     for(const engine of engines){console.log(`正在检查 ${engine}……`);await doctor(config,engine);}
     const session=await readJSON(p.session,null);
-    const codexDefaults={codexAuth:'local',codexBaseUrl:'',codexModel:'',codexApiKeyEnv:'OPENAI_API_KEY'};
-    if(session && old.workspace===config.workspace && Object.keys(codexDefaults).some(k=>(old[k] || codexDefaults[k])!==(config[k] || codexDefaults[k]))) {session.codex={workspace:config.workspace};for(const slot of Object.values(session.projectSessions || {}))delete slot.codex;await writeJSON(p.session,session);}
-    if(session && old.workspace!==config.workspace) {
-      session.codex={workspace:config.workspace};session.claude={workspace:config.workspace};config.currentProject='default';await writeJSON(p.session,session);
-      console.log('工作目录变化，已为新目录清空会话引用，原工作文件未删除。');
-    }
+    if(session && migrateAuthSessions(session,{...old,workspace:old.workspace || p.workspace}))await writeJSON(p.session,session);
+    if(old.workspace!==config.workspace)config.currentProject='default';
     await writeJSON(p.config,config);
   }finally{await releaseLock(p);}
   console.log(`已配置 ${engines.join(' + ')}，默认引擎：${config.engine}。微信用 /引擎 切换。`);
@@ -268,13 +267,7 @@ async function model() {
     if(result.error)throw new Error(result.error);
     console.log(`模型已设置为 ${result.model}，下一条任务生效；可用性由账号或服务商决定。`);return;
   }
-  await privateDir(p.dir);await acquireLock(p);
-  try {
-    const config=await readJSON(p.config,{});
-    const next=modelConfig(config,config.engine || 'codex',value);
-    await writeJSON(p.config,next);
-    console.log('模型设置已保存，下次启动生效。');
-  }finally{await releaseLock(p);}
+  await saveModel(p,value);console.log('模型设置已保存，下次启动生效。');
 }
 async function mediaCheck() {
   for(const [label,binary] of [['FFmpeg',process.env.FFMPEG_BINARY || 'ffmpeg'],['FFprobe',process.env.FFPROBE_BINARY || 'ffprobe'],['Whisper',process.env.WHISPER_BINARY || 'whisper-cli']]) {
@@ -321,10 +314,10 @@ async function migrate() {
 try {
   if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
-  const commands={workspace:async()=>{const args=process.argv.slice(3);if(args.length>1)throw Error('用法：wx-agent workspace [完整路径]；含空格路径请加引号');const result=await manageWorkspace(p,args[0]);if(result.error)throw Error(result.error);console.log(`工作目录：${result.workspace}\n项目：${result.project}\n${result.applied==='live'?'当前服务已生效':'已保存，下次启动生效'}`);},dashboard:async()=>{const {url}=await startDashboard({base:p.baseDir});console.log('本机管理面板（链接包含访问凭证，请勿分享）：\n'+url+'\n按 Ctrl+C 关闭面板，桥接服务继续运行。');const opener=process.platform==='darwin'?'open':process.platform==='win32'?'rundll32':'xdg-open';const args=process.platform==='win32'?['url.dll,FileProtocolHandler',url]:[url];const child=spawn(opener,args,{stdio:'ignore',windowsHide:true});child.on('error',()=>{});},project,'ocr-check':async()=>{await ocrCheck();console.log('OCR 环境已就绪（中英文）。');},'ocr-setup':async()=>{await ocrSetup();console.log('OCR 环境已就绪。');},setup,start,stop,update,user,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('PDF / Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
+  const commands={workspace:async()=>{const args=process.argv.slice(3);if(args.length>1)throw Error('用法：wx-agent workspace [完整路径]；含空格路径请加引号');const result=await manageWorkspace(p,args[0]);if(result.error)throw Error(result.error);console.log(`工作目录：${result.workspace}\n项目：${result.project}\n${result.applied==='live'?'当前服务已生效':'已保存，下次启动生效'}`);},dashboard:async()=>{const panel=await startDashboard({base:p.baseDir}),{url}=panel;let closing=false;const close=()=>{if(closing)return;closing=true;void panel.close().finally(()=>process.exit(0));};process.on('SIGINT',close);process.on('SIGTERM',close);console.log('本机管理面板（链接包含访问凭证，请勿分享）：\n'+url+'\n按 Ctrl+C 关闭面板，桥接服务继续运行。');const opener=process.platform==='darwin'?'open':process.platform==='win32'?'rundll32':'xdg-open';const args=process.platform==='win32'?['url.dll,FileProtocolHandler',url]:[url];const child=spawn(opener,args,{stdio:'ignore',windowsHide:true});child.on('error',()=>{});},project,'ocr-check':async()=>{await ocrCheck();console.log('OCR 环境已就绪（中英文）。');},'ocr-setup':async()=>{await ocrSetup();console.log('OCR 环境已就绪。');},setup,start,stop,update,user,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('PDF / Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.21.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.22.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

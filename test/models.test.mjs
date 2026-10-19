@@ -20,3 +20,8 @@ test('Claude 使用真实目录，支持上下文后缀并区分最近实际模�
  const text=await modelListText({claudeModel:'sonnet[1m]'},'claude',{request:async()=>({data:[{model:'default'},{model:'sonnet[1m]'},{model:'haiku'}],currentModel:'claude-actual'})});
  assert.match(text,/\/模型 sonnet\[1m\]/);assert.match(text,/\/模型 haiku/);assert.match(text,/最近任务实际模型：claude-actual/);assert.ok(!text.includes('备用'));
 });
+
+test('结构化模型目录不把备用别名当授权模型',async()=>{
+ const {modelListResult}=await import('../models.mjs');const good=await modelListResult({},'codex',{request:async()=>({data:[{model:'one'},{model:'two',hidden:true}]})});assert.deepEqual(good.items,[{id:'one',label:'one'}]);assert.equal(good.source,'cli');assert.match(good.text,/\/模型 one/);
+ const bad=await modelListResult({},'claude',{request:async()=>{throw Error('private');}});assert.deepEqual(bad.items,[]);assert.equal(bad.source,'unavailable');assert.ok(!bad.text.includes('private'));
+});
