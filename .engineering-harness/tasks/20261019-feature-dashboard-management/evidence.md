@@ -21,3 +21,5 @@ P-04 最终审查发现停止状态清空 Codex 模型仍沿用旧线程模型�
 版本 0.22.0；npm pack 43 文件，6 个新增运行模块全部包含；git diff --check 与 JS syntax 检查通过。仓库没有既定 formatter，不宣称 formatter 通过；独立语义审核通过。文档按本次能力同步；最大模型目录响应实测 31581 字符，小于 IPC 32000 上限。当前真实默认用户连接正常且空闲，girlfriend 未绑定/停止；升级须保持这一状态。提交后以完整 SHA 检查三平台 Node22/24 CI，再发布并使用现有更新器升级。
 
 P-04 独立审核通过，快照 sha256:5f6428298dfb13a73f0f7dc5989f112b6ebdc3b07cde9f311caa1b760bc2ad08。
+
+提交后 CI：Linux/macOS × Node22/24 全通过；Windows 两矩阵旧会话恢复失败。同步 fs.realpathSync 与异步原生 realpath 在 Windows 短目录名表示不同，认证 hash 不一致。统一为 realpathSync.native，一行兼容修正经独立复核 pass；本机相关7项回归通过。保持已推送历史，追加 CI 兼容修正提交；Windows 结果由复跑确认后再发布。

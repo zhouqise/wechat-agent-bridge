@@ -1,7 +1,7 @@
 import {realpathSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {engineAuth} from './auth-config.mjs';
-const canonical=value=>{try{return realpathSync(value);}catch{return value;}};
+const canonical=value=>{try{return realpathSync.native(value);}catch{return value;}};
 const hash=value=>createHash('sha256').update(value).digest('hex');
 export function authFingerprint(config,engine,env=process.env){
  if((config[engine+'Auth'] || 'local')==='local')return hash('local');
