@@ -7,6 +7,7 @@ import {promisify} from 'node:util';
 import {createInterface} from 'node:readline/promises';
 import {paths,privateDir,readJSON,writeJSON,alive,acquireLock,releaseLock} from './paths.mjs';
 import {control} from './service.mjs';
+import {startDashboard} from './dashboard.mjs';
 import {configureEngines} from './setup-engines.mjs';
 import {officeSetup,officeCheck} from './office.mjs';
 import {modelListText,modelInfo,modelConfig} from './models.mjs';
@@ -38,6 +39,7 @@ const help=`wx-agent — 在个人微信使用本机 Codex / Claude Code
   stop           停止桥接及其引擎子进程
   restart        停止后重新启动
   update         升级到 GitHub 最新稳定版（--check 只检查）
+  dashboard      打开本机管理面板（终端保留运行）
   status         查看进程、微信、引擎和任务状态
   logs           查看最近日志（logs --follow 持续查看）
   doctor         检查当前引擎（--engine claude 或 codex）
@@ -317,10 +319,10 @@ async function migrate() {
 try {
   if(!['darwin','linux','win32'].includes(process.platform))throw new Error('当前版本支持 macOS、Linux 和 Windows');
   const command=process.argv[2] || 'help';
-  const commands={project,'ocr-check':async()=>{await ocrCheck();console.log('OCR 环境已就绪（中英文）。');},'ocr-setup':async()=>{await ocrSetup();console.log('OCR 环境已就绪。');},setup,start,stop,update,user,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('PDF / Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
+  const commands={dashboard:async()=>{const {url}=await startDashboard({base:p.baseDir});console.log('本机管理面板（链接包含访问凭证，请勿分享）：\n'+url+'\n按 Ctrl+C 关闭面板，桥接服务继续运行。');const opener=process.platform==='darwin'?'open':process.platform==='win32'?'rundll32':'xdg-open';const args=process.platform==='win32'?['url.dll,FileProtocolHandler',url]:[url];const child=spawn(opener,args,{stdio:'ignore',windowsHide:true});child.on('error',()=>{});},project,'ocr-check':async()=>{await ocrCheck();console.log('OCR 环境已就绪（中英文）。');},'ocr-setup':async()=>{await ocrSetup();console.log('OCR 环境已就绪。');},setup,start,stop,update,user,engine,model,'media-check':mediaCheck,'office-setup':async()=>{console.log('正在安装 Office 处理环境……');await officeSetup();console.log('Office 环境已就绪。');},'office-check':async()=>{await officeCheck();console.log('PDF / Excel / Word / PPT 处理环境已就绪。');},restart:async()=>{await stop();await start();},status,logs,doctor,
     login:async()=>{if(await busy())throw new Error('请先 wx-agent stop');await foreground(['--login',...(process.argv.includes('--force')?['--force']:[])]);},
     run:()=>foreground(),migrate,paths:async()=>console.log(p.dir),
-    '--version':async()=>console.log('0.19.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
+    '--version':async()=>console.log('0.20.0'),help:async()=>console.log(help),'--help':async()=>console.log(help),'-h':async()=>console.log(help)};
   if(!commands[command])throw new Error('未知命令，请执行 wx-agent --help');
   await commands[command]();
 }catch(e){console.error(`错误：${e.message}`);process.exitCode=1;}

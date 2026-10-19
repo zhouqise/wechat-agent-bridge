@@ -52,3 +52,9 @@ test('完成回传期间仍占用当前任务，迟到完成事件不会再次�
  let release,finishes=0,settled=0;const c=new Controller({rpc:new RPC(),cwd:os.tmpdir(),send:async()=>{},save:async()=>{},onFinish:()=>{finishes++;return new Promise(r=>release=r);}});await c.initialize();await c.handle('task','k');await c.starting;c.onSettled=()=>settled++;
  const event={method:'turn/completed',params:{threadId:'t',turn:{id:'u',status:'completed'}}};const finishing=c.event(event);await until(()=>finishes===1);assert.ok(c.active);assert.equal(settled,0);release();await finishing;assert.equal(c.active,null);assert.equal(settled,1);await c.event(event);assert.equal(finishes,1);c.close();
 });
+test('连接恢复前保留等待任务，恢复后提交一次，安静模式不刷接收提示',async t=>{
+ let ready=false;const runs=[],messages=[];const q=new TaskQueue({quiet:true,available:()=>ready,textMs:0,say:async x=>messages.push(x),run:async x=>runs.push(x)});t.after(()=>q.close());
+ await q.enqueue('waiting',[],'one','context');await q.pump();assert.equal(q.pending.length,1);assert.equal(runs.length,0);
+ ready=true;await q.pump();assert.equal(runs.length,1);assert.equal(q.pending.length,0);await q.pump();assert.equal(runs.length,1);
+ messages.length=0;await q.enqueue('fast',[],'two','context');assert.equal(messages.length,0);await q.pump();assert.equal(runs.length,2);
+});

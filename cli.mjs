@@ -11,7 +11,7 @@ import {modelListText,modelInfo,prepareModel} from './models.mjs';
 import {officeInputs,workspaceDir,FILE_EXTS} from './office.mjs';
 import {sendOfficeFile} from './file-send.mjs';
 import {webInputs} from './web.mjs';
-import {isConversationMutation} from './conversations.mjs';
+import {changeConversation,isConversationMutation} from './conversations.mjs';
 import {TaskQueue} from './task-queue.mjs';
 import {projectList,projectPath} from './projects.mjs';
 import {outputSnapshot,returnFiles} from './auto-files.mjs';
@@ -32,6 +32,8 @@ let lastPollAt = null;
 let lastReceivedAt = null;
 let stopping = false;
 let saving = Promise.resolve();
+let recoveryTimer;
+const health={wechat:'connecting',failures:0,nextRetryAt:null,engineRetries:0};
 async function save(state) {
   const data = JSON.stringify(state);
   const job = saving.then(async () => {
@@ -46,6 +48,7 @@ async function save(state) {
 async function clean() {
   if (stopping) return;
   stopping = true;
+  clearInterval(recoveryTimer);
   tasks?.close();
   const preparing=controller?.active?.abort?controller.starting:null;
   controller?.close();
@@ -158,6 +161,7 @@ async function main() {
       }});
       try {
         await candidate.initialize();
+        if(stopping)throw Error('服务正在停止');
         await save(state);
         if(persist || project!==null)await writeJSON(p.config,{...config,engine:next,...(project!==null?{currentProject:project}:{})});
       }catch(e){candidate.close();throw e;}
@@ -175,7 +179,7 @@ async function main() {
       }finally{changing=false;}
     };
     await selectEngine(config.engine || 'codex');
-    tasks=new TaskQueue({state:state.tasks ||= {},save:()=>save(state),say:text=>controller.say(text),run:async task=>{
+    tasks=new TaskQueue({quiet:config.notifications!=='verbose',available:()=>controller.ready && !changing,state:state.tasks ||= {},save:()=>save(state),say:text=>controller.say(text),run:async task=>{
       if(!controller.ready)throw Error('引擎未连接');
       taskToken=task.contextToken;beforeFiles=null;
       try{
@@ -195,13 +199,37 @@ async function main() {
       }finally{controller.onSettled=null;taskToken=null;beforeFiles=null;}
     }});
   }
-  server = await serve(p, () => ({pid:process.pid,startedAt,...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,project:currentProject,conversation:controller?.state.currentConversation,queued:tasks?.pending.length || 0,task:controller?.active?(controller.approvals.size?'等待确认':'执行中'):(tasks?.busy?'排队中':'空闲')}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc));
+  recoveryTimer=setInterval(()=>{
+    if(echo || stopping || changing || controller.ready || tasks.busy && tasks.active)return;
+    if(Date.now()<(health.engineRetryAt || 0))return;
+    changing=true;
+    void (async()=>{try{await controller.starting;await controller.queue;if(stopping)return;await selectEngine(engine);health.engineRetries=0;health.engineRetryAt=null;}catch{health.engineRetries++;health.engineRetryAt=Date.now()+Math.min(60000,2000*2**Math.min(health.engineRetries,5));}finally{changing=false;}})();
+  },1000);recoveryTimer.unref();
+  server = await serve(p, () => ({pid:process.pid,startedAt,health:{...health},...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,project:currentProject,conversation:controller?.state.currentConversation,queued:tasks?.pending.length || 0,task:changing?'连接或配置变更中':controller?.active?(controller.approvals.size?'等待确认':'执行中'):(tasks?.busy?'排队中':'空闲')}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc),async request=>{
+    if(echo)throw Error('测试模式不支持管理');
+    const {action,value=''}=request;
+    if(action==='inspect')return {current:controller.state.currentConversation,conversations:controller.state.conversations.map(({id,number,title,updatedAt})=>({id,number,title,updatedAt})),queue:tasks.pending.map(({id,text})=>({id,title:text.slice(0,80)})),active:tasks.active?{id:tasks.active.id,stage:controller.active?.stage}:null,projects:Object.keys(projectList(config,p.workspace)),notifications:config.notifications || 'quiet'};
+    if(changing || tasks.busy || controller.active)throw Error('请等待任务完成或在微信取消并清空队列后操作');
+    if(typeof value!=='string' || value.length>100)throw Error('参数无效');
+    changing=true;
+    try{
+      if(action==='engine')await selectEngine(value,true);
+      else if(action==='project')await selectEngine(engine,false,await projectPath(config,p.workspace,value),value);
+      else if(action==='notifications'){if(!['quiet','verbose'].includes(value))throw Error('通知设置无效');await writeJSON(p.config,{...config,notifications:value});config.notifications=value;controller.quiet=tasks.quiet=value==='quiet';}
+      else if(['new','switch','delete','clear'].includes(action)){
+        const backup=structuredClone(controller.state);
+        try{const result=changeConversation(controller.state,action,value);await controller.save();if(result.changed){controller.loaded=false;controller.items.clear();}}
+        catch(e){for(const key of Object.keys(controller.state))delete controller.state[key];Object.assign(controller.state,backup);throw e;}
+      }else throw Error('未知操作');
+      return {ok:true};
+    }finally{changing=false;}
+  });
   console.log('桥接已启动。微信发送 /帮助 或直接发送任务；wx-agent status 查看状态。');
   let failures = 0;
   while (true) {
     try {
       const batch = await api(state.base, 'ilink/bot/getupdates', {get_updates_buf: state.cursor || ''}, state.token);
-      lastPollAt = Date.now();
+      lastPollAt = Date.now();health.wechat='connected';health.failures=0;health.nextRetryAt=null;
       await acceptBatch(state, batch, save, async body => {
         const sent = await api(state.base, 'ilink/bot/sendmessage', body, state.token);
         if (sent.ret !== 0) throw new Error('发送响应未确认成功');
@@ -263,9 +291,10 @@ async function main() {
       if (e.code === -14) throw new Error('微信登录已失效，请停止并重新绑定');
       // 长轮询没有新消息时的超时不代表登录或连接故障。
       if (e.name === 'TimeoutError' || e.name === 'AbortError') continue;
-      if (++failures >= 5) throw new Error('收发连续失败 5 次，已停止。请检查网络后重新启动。');
+      failures++;health.wechat='retrying';health.failures=failures;
+      const delay=Math.min(60000,2000*2**Math.min(failures,5))+Math.floor(Math.random()*1000);health.nextRetryAt=Date.now()+delay;
       console.log('本次收发未确认完成，稍后恢复接收；不会自动重发不确定的回复。');
-      await sleep(Math.min(30000, 2000 * 2 ** failures));
+      await sleep(delay);
     }
   }
 }

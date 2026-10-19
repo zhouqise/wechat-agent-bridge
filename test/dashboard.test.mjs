@@ -1,0 +1,27 @@
+import http from 'node:http';
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {startDashboard} from '../dashboard.mjs';
+import {paths,writeJSON} from '../paths.mjs';
+import {serve} from '../service.mjs';
+test('面板仅监听回环、认证及来源校验，用户隔离和日志凭证遮盖',async t=>{
+ const base=await fs.mkdtemp(path.join(os.tmpdir(),'wxpanel-'));t.after(()=>fs.rm(base,{recursive:true,force:true}));
+ const p=paths({WX_CODEX_HOME:base});await writeJSON(p.config,{engine:'codex',codexProxy:'http://secret:password@localhost',secret:'DO_NOT_RETURN'});await fs.writeFile(p.log,'token=private123\nBearer abcdef\nsk-testing-key\nnormal log');
+ const calls=[];const ipc=await serve(p,()=>({task:'执行中',engine:'codex'}),()=>calls.push('stop'),null,null,request=>{calls.push(request.action);return {ok:true};});t.after(()=>ipc.close());
+ const d=await startDashboard({base});t.after(()=>new Promise(r=>d.server.close(r)));assert.equal(d.server.address().address,'127.0.0.1');
+ const request=(body,headers={})=>fetch(d.origin+'/api',{method:'POST',headers:{Authorization:'Bearer '+d.token,Origin:d.origin,'Content-Type':'application/json',...headers},body:JSON.stringify(body)});
+ assert.equal((await request({action:'users'},{Authorization:'Bearer wrong'})).status,401);
+ assert.equal((await request({action:'users'},{Origin:'https://attacker.example'})).status,403);
+ assert.equal(await new Promise((resolve,reject)=>{const r=http.get(d.origin,{headers:{Host:'attacker.example'}},res=>{res.resume();resolve(res.statusCode);});r.on('error',reject);}),403);
+ assert.equal((await request({action:'users'},{Origin:''})).status,403);
+ const users=await (await request({action:'users'})).text();assert.ok(users.includes('default'));assert.ok(!users.includes('DO_NOT_RETURN')&&!users.includes('password'));
+ const log=await (await request({action:'logs'})).text();assert.ok(log.includes('normal log'));assert.ok(!log.includes('private123')&&!log.includes('abcdef')&&!log.includes('sk-testing'));
+ assert.equal((await request({action:'inspect',user:'../other'})).status,400);
+ assert.equal((await request({action:'admin',operation:'shell',value:'whoami'})).status,400);
+ assert.equal((await (await request({action:'stop'})).json()).error,'busy');assert.ok(!calls.includes('stop'));
+ assert.equal((await (await request({action:'admin',operation:'new',value:'test'})).json()).ok,true);assert.ok(calls.includes('new'));
+ const page=await fetch(d.origin);assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);assert.ok(!(await page.text()).includes(d.token));
+});

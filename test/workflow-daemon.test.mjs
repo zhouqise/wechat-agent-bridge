@@ -1,3 +1,5 @@
+import {control} from '../service.mjs';
+import {paths} from '../paths.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -12,7 +14,7 @@ test('完整流程：文件+说明合并、队列串行、结果自动回传、�
  await fs.writeFile(mock,`import fs from 'node:fs';import path from 'node:path';import {createInterface} from 'node:readline';
 const send=m=>process.stdout.write(JSON.stringify(m)+'\\n');let thread,turn=0;
 createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.method==='thread/start'||m.method==='thread/resume'){thread=m.params.threadId||'thread-'+path.basename(m.params.cwd);send({id:m.id,result:{thread:{id:thread}}});}
-else if(m.method==='turn/start'){const id='turn-'+(++turn),p=m.params;fs.appendFileSync(process.env.FLOW_CALLS,JSON.stringify(p)+'\\n');send({id:m.id,result:{turn:{id}}});setTimeout(()=>{fs.mkdirSync(path.join(p.cwd,'wx-agent-output'),{recursive:true});fs.writeFileSync(path.join(p.cwd,'wx-agent-output','result'+turn+'.txt'),'result '+turn);send({method:'item/completed',params:{threadId:thread,turnId:id,item:{id:'msg'+id,type:'agentMessage',phase:'final_answer',text:'done'}}});send({method:'turn/completed',params:{threadId:thread,turn:{id,status:'completed'}}});},2200);}
+else if(m.method==='turn/start'){const id='turn-'+(++turn),p=m.params;fs.appendFileSync(process.env.FLOW_CALLS,JSON.stringify(p)+'\\n');send({id:m.id,result:{turn:{id}}});if(p.input[0].text==='crash-test'){setTimeout(()=>process.exit(1),50);return;}setTimeout(()=>{fs.mkdirSync(path.join(p.cwd,'wx-agent-output'),{recursive:true});fs.writeFileSync(path.join(p.cwd,'wx-agent-output','result'+turn+'.txt'),'result '+turn);send({method:'item/completed',params:{threadId:thread,turnId:id,item:{id:'msg'+id,type:'agentMessage',phase:'final_answer',text:'done'}}});send({method:'turn/completed',params:{threadId:thread,turn:{id,status:'completed'}}});},2200);}
 else if(m.id!==undefined&&m.method)send({id:m.id,result:{}});});`);
  await fs.writeFile(preload,`import fs from 'node:fs';
 globalThis.fetch=async(url,options)=>{let msgs=[];
@@ -45,6 +47,16 @@ return new Response(JSON.stringify({ret:0,msgs}));};`);
   await batch([msg('/切换会话 '+original)]);await wait(async()=>(await status()).conversation===original);
   await batch([msg('/删除会话 '+newer)]);await wait(async()=>(await out()).some(x=>x.msg.item_list[0].text_item?.text.includes('已删除桥接会话记录 '+newer)));
   await run('restart');assert.equal((await status()).conversation,original);
+  const p=paths({WX_CODEX_HOME:dir});const inspect=()=>control(p,'admin',{action:'inspect'});
+  assert.equal((await inspect()).current,original);
+  await control(p,'admin',{action:'new',value:'Panel session'});assert.notEqual((await inspect()).current,original);
+  await control(p,'admin',{action:'switch',value:original});assert.equal((await inspect()).current,original);
+  const beforeCrash=(await calls()).length;await batch([msg('crash-test'),msg('/开始')]);
+  await wait(async()=>(await calls()).length===beforeCrash+1 && (await status()).task==='空闲' && (await status()).agentReady);
+  await batch([msg('after recovery'),msg('/开始')]);await wait(async()=>(await calls()).length===beforeCrash+2 && (await status()).task==='空闲');
+  assert.equal((await calls()).filter(x=>x.input[0].text==='crash-test').length,1);
+  await control(p,'admin',{action:'clear'});assert.equal((await inspect()).conversations.length,1);
+
 
  }finally{await run('stop').catch(()=>{});await fs.rm(dir,{recursive:true,force:true});}
 });

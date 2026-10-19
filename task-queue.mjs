@@ -1,8 +1,8 @@
 import {randomBytes} from 'node:crypto';
 // One scheduler per bound user. Payloads stay in memory; only recovery counts persist.
 export class TaskQueue {
-  constructor({run,say,save=async()=>{},state={},textMs=1500,mediaMs=8000,maxMs=20000}) {
-    Object.assign(this,{run,say,save,state,textMs,mediaMs,maxMs});this.pending=[];this.active=null;
+  constructor({run,say,save=async()=>{},state={},textMs=1500,mediaMs=8000,maxMs=20000,quiet=false,available=()=>true}) {
+    Object.assign(this,{run,say,save,state,textMs,mediaMs,maxMs,quiet,available});this.pending=[];this.active=null;
     this.recovered=(state.waiting || 0)+(state.running?1:0);state.waiting=0;state.running=null;
   }
   get busy(){return !!this.active || this.pending.length>0;}
@@ -18,12 +18,13 @@ export class TaskQueue {
     Object.assign(task,{text:combined,items:all,contextToken,due:Math.min(task.created+this.maxMs,now+(all.length?this.mediaMs:this.textMs))});
     if(!merge)this.pending.push(task);
     await this.persist();this.arm();
-    if(!merge)await this.say(`已接收任务 ${task.id}${all.length?'，等待 8 秒合并后续说明或附件':'，短暂合并连续消息'}。${this.active?'正在排队。':''}发送 /开始 立即提交，/任务 查看。`);
+    if(!merge && (!this.quiet || all.length || this.active || !this.available()))await this.say(`已接收任务 ${task.id}${all.length?'，等待 8 秒合并后续说明或附件':'，短暂合并连续消息'}。${this.active?'正在排队。':''}发送 /开始 立即提交，/任务 查看。`);
   }
   arm(){clearTimeout(this.timer);if(this.closed || this.active || !this.pending.length)return;this.timer=setTimeout(()=>{void this.pump().catch(()=>{this.close();void this.say('任务队列无法保存，已暂停接收，请重启并检查磁盘。');});},Math.max(0,this.pending[0].due-Date.now()));this.timer.unref?.();}
   async pump(){
     if(this.closed || this.active || !this.pending.length)return;
     if(this.pending[0].due>Date.now()){this.arm();return;}
+    if(!this.available()){this.timer=setTimeout(()=>{this.arm();},1000);this.timer.unref?.();return;}
     const task=this.pending.shift();this.active=task;
     try{await this.persist();await this.run(task);}
     catch{await this.say(`任务 ${task.id} 未完成，请检查 /状态；不会自动重跑。`);}

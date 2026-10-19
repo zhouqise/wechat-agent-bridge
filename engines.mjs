@@ -18,5 +18,5 @@ export function makeController({engine,cwd,config,state,save,send,onFinish}) {
   engineName(engine);
   const proxy=process.env[engine==='codex'?'BRIDGE_CODEX_PROXY':'BRIDGE_CLAUDE_PROXY'] || config[engine==='codex'?'codexProxy':'claudeProxy'];
   const rpc=engine==='codex'?new CodexRPC({cwd,proxy,config}):new ClaudeRPC({cwd,proxy,auth:config.claudeAuth || 'local',model:config.claudeModel});
-  return new Controller({rpc,cwd,state:engineState(state,engine,cwd),save,send,onFinish,label:engine==='codex'?'Codex':'Claude Code'});
+  return new Controller({rpc,cwd,state:engineState(state,engine,cwd),save,send,onFinish,quiet:config.notifications!=='verbose',label:engine==='codex'?'Codex':'Claude Code'});
 }

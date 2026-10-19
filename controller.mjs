@@ -5,14 +5,14 @@ import {officePython} from './office.mjs';
 export const HELP = '直接发网页链接、文字、截图、微信语音、MP4 视频或 PDF、Office、TXT/MD/CSV 等文本附件即可交给当前引擎。视频最长 30 分钟、最大 200 MB，抽帧并分段转写音轨；语音只使用微信附带转文字。图片每条最多 4 张，单张不超过 10 MB。\n/引擎：查看引擎；/引擎 codex 或 /引擎 claude 切换\n/模型：查看模型设置；/模型 模型名 切换\n/项目：查看登记项目；/项目 名称 切换\n/任务 或 /队列：查看任务列表\n/开始：立即提交合并中的消息\n/取消 编号：移除等待任务；/清空队列：移除所有等待任务\n/状态：查看任务\n/取消：中断任务\n/会话 或 /会话列表：列出当前项目和引擎的会话\n/切换会话 序号或ID：恢复会话\n/删除会话 编号：移除桥接会话记录\n/新会话 [名称]：创建会话，保留旧会话\n/清空会话 或 /清空所有会话：清空当前列表并新建\n/文件：列出结果；/文件 文件名 取回附件文件\n/结果：重新获取最近结果\n/帮助：显示命令\n审批：/批准 编号 或 /拒绝 编号\n回答：/回答 编号 内容';
 
 export class Controller {
-  constructor({rpc, cwd, state = {}, save, send, approvalMs = 300000, label = 'Codex', onFinish = async()=>{}}) {
-    Object.assign(this, {rpc, cwd, state, save, send, approvalMs, label, onFinish});
+  constructor({rpc, cwd, state = {}, save, send, approvalMs = 300000, label = 'Codex', onFinish = async()=>{}, quiet = false, progressMs = 8000}) {
+    Object.assign(this, {rpc, cwd, state, save, send, approvalMs, label, onFinish, quiet, progressMs});
     ensureConversations(state);this.save=async()=>{syncConversation(state);await save(state);};
     this.active = null; this.ready = false; this.approvals = new Map(); this.items = new Map(); this.queue = Promise.resolve();
     this.delivery = Promise.resolve();
     rpc.on('notification', m => {this.queue = this.queue.then(() => this.event(m)).catch(() => this.say('处理任务事件失败，请发送 /状态 检查。'));});
     rpc.on('request', m => {this.queue = this.queue.then(() => this.approveRequest(m)).catch(() => {try {rpc.reject(m.id);} catch {}});});
-    rpc.on('disconnected', () => {this.ready = false; this.clearApprovals(); this.active = null; this.onSettled?.(); if (!this.closing && !this.suppressDisconnect) void this.say(`${this.label} 连接已断开，请在电脑上重启桥接程序。`);});
+    rpc.on('disconnected', () => {this.ready = false; clearTimeout(this.progressTimer); this.active?.abort?.abort(); this.clearApprovals(); this.active = null; this.onSettled?.(); if (!this.closing && !this.suppressDisconnect) void this.say(`${this.label} 连接已断开，将自动恢复连接；中断任务不会自动重跑。`);});
   }
   say(text) {
     const job = this.delivery.then(() => this.send(text));
@@ -80,13 +80,14 @@ export class Controller {
     if (this.active) return this.say('已有任务执行中。可发送 /状态 或 /取消；完成后再发送下一条任务。');
     if ([...text].length > 12000) return this.say('任务描述过长，请控制在 12000 字以内。');
     this.active = {stage:'正在建立会话', turnId:null}; this.items.clear();
+    if(this.quiet){clearTimeout(this.progressTimer);this.progressTimer=setTimeout(()=>{if(this.active && !this.approvals.size)void this.say(`${this.label} 正在处理，可发送 /状态 或 /取消。`);},this.progressMs);this.progressTimer.unref?.();}
     // 异步执行，微信接收循环保持可用以处理取消和审批。
     this.starting = (async () => {
       let images=[];
       if(prepareImages) {
         this.active.stage='正在接收和解析媒体';
         const abort=new AbortController();this.active.abort=abort;
-        await this.say(`已收到内容，正在读取并交给 ${this.label} 分析。`);
+        if(!this.quiet)await this.say(`已收到内容，正在读取并交给 ${this.label} 分析。`);
         try {images=await prepareImages(abort.signal,stage=>{if(this.active?.abort===abort)this.active.stage=stage;});if(abort.signal.aborted)throw new Error('已取消媒体处理');}
         catch(e) {
           this.active=null;
@@ -108,7 +109,7 @@ export class Controller {
       }
       // turn/start 超时可能已执行，断开子进程，避免错误地允许第二个任务。
       this.active = null; this.state.active = null; this.ready = false; this.suppressDisconnect=true;this.rpc.close();this.suppressDisconnect=false;
-      this.state.lastResult = `任务启动或会话恢复失败，已关闭 ${this.label} 连接以避免重复执行。请检查电脑后重启。`;
+      this.state.lastResult = `任务启动或会话恢复失败，已关闭 ${this.label} 连接以避免重复执行。将自动恢复连接；本次任务不会自动重跑，请核对工作区后重发。`;
       await this.save(this.state); await this.say(this.state.lastResult);
     });
   }
@@ -116,7 +117,7 @@ export class Controller {
     syncConversation(this.state,text);
     await this.thread();
     this.state.active = {startedAt:Date.now()}; await this.save(this.state);
-    await this.say(`${this.label} 已接收任务，正在配置的工作区处理。可发送 /状态 或 /取消。`);
+    if(!this.quiet)await this.say(`${this.label} 已接收任务，正在配置的工作区处理。可发送 /状态 或 /取消。`);
     const r = await this.rpc.request('turn/start', {threadId:this.state.threadId,
       input:[{type:'text', text}, ...images], clientUserMessageId:key,
       cwd:this.cwd, approvalPolicy:'on-request', approvalsReviewer:'user',
@@ -140,6 +141,7 @@ export class Controller {
     }
     if (method === 'item/completed') this.items.set(p.item.id, p.item);
     if (method === 'turn/completed') {
+      clearTimeout(this.progressTimer);
       this.clearApprovals();
       const messages = [...this.items.values()].filter(i => i.type === 'agentMessage' && i.text);
       const final = messages.filter(i => i.phase === 'final_answer');
@@ -202,5 +204,5 @@ export class Controller {
     for (const a of this.approvals.values()) {clearTimeout(a.timer);if (deny) {try {this.deny(a);} catch {}}}
     this.approvals.clear();
   }
-  close() {this.closing = true;this.active?.abort?.abort();this.clearApprovals(true);this.rpc.close();}
+  close() {clearTimeout(this.progressTimer);this.closing = true;this.active?.abort?.abort();this.clearApprovals(true);this.rpc.close();}
 }

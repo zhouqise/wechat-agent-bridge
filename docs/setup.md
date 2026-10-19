@@ -6,10 +6,10 @@
 
 需要 Node.js 22+、npm、系统 curl，以及至少一种本机引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。当前核对版本为 Codex CLI 0.159.2、Claude Code 2.1.121。
 
-直接在终端执行以下命令，安装 GitHub Release 中的 v0.19.0：
+直接在终端执行以下命令，安装 GitHub Release 中的 v0.20.0：
 
 ```sh
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.20.0/wx-codex-bridge-0.20.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -19,7 +19,7 @@ wx-agent start
 macOS/Linux 如果 npm 全局目录没有写入权限，可安装到用户目录：
 
 ```sh
-npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
+npm install -g --prefix "$HOME/.local" https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.20.0/wx-codex-bridge-0.20.0.tgz --ignore-scripts
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -40,7 +40,7 @@ export PATH="$HOME/.local/bin:$PATH"
 ```powershell
 npm.cmd install -g @openai/codex
 codex.cmd login
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.20.0/wx-codex-bridge-0.20.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 wx-agent.cmd status

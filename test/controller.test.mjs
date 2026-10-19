@@ -138,3 +138,10 @@ test('启动任务结果不确定仍关闭连接，绝不复制或重复提交',
  rpc.request=async function(method,params){this.calls.push({method,params});if(method==='thread/start')return {thread:{id:'t'}};throw Error('timeout');};
  await c.handle('task','1');await c.starting;assert.equal(c.ready,false);assert.equal(closed,1);assert.equal(rpc.calls.filter(x=>x.method==='turn/start').length,1);assert.equal(rpc.calls.some(x=>x.method==='thread/fork'),false);assert.equal(messages.filter(x=>x.includes('连接已断开')).length,0);
 });
+test('安静通知：短任务只有结果，长任务一次进度，断线不重放',async()=>{
+ const {controller:c,rpc,messages}=await setup({quiet:true,progressMs:30});
+ await c.handle('short','k',async()=>[]);await c.starting;assert.equal(messages.length,0);
+ await c.event({method:'turn/completed',params:{threadId:'thread1',turn:{id:'turn1',status:'completed'}}});await new Promise(r=>setTimeout(r,50));assert.equal(messages.length,1);
+ await c.handle('long','k2');await c.starting;await new Promise(r=>setTimeout(r,60));assert.equal(messages.filter(x=>x.includes('正在处理')).length,1);
+ rpc.emit('disconnected');await c.delivery;assert.equal(c.ready,false);assert.equal(c.active,null);assert.equal(rpc.calls.filter(x=>x.method==='turn/start').length,2);c.close();
+});

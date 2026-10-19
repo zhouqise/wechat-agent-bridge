@@ -64,6 +64,20 @@ wx-agent user stop teammate    # 只停止指定用户
 | **网页内容分析** | 提取公开网页静态正文，用于总结、比较与追问 |
 | **后台管理与升级** | 查看状态、日志和单次审批；关闭终端仍可运行，`wx-agent update` 升级 |
 
+## 本机管理面板
+
+安装或升级后，在任意目录运行：
+
+```bash
+wx-agent dashboard
+```
+
+自动打开浏览器，集中查看所有用户的连接状态、任务队列和日志；切换引擎、模型、已登记项目，创建、切换、删除会话，或清空当前列表并新建会话。支持启动服务和空闲时停止，无需记住每条管理命令。
+
+面板只在本机开放，访问链接带随机凭证，请勿分享。终端按 Ctrl+C 关闭面板，后台桥接继续运行。首次安装、账号认证和扫码仍通过 `wx-agent setup` / `wx-agent user add 名称` 完成。
+
+默认启用安静通知：普通短任务直接返回结果，超过 8 秒的任务补发一条进度；附件合并、排队、审批和错误仍及时提示。面板可切换为完整进度。网络波动时自动重试接收；引擎进程断开后自动重建连接，等待任务保留。已提交但结果不确定的任务不自动重跑，避免重复改文件。
+
 ## 快速开始
 
 准备 **Node.js 22+、npm、系统 curl**，以及至少一种已安装并完成认证配置的引擎：[Codex CLI](https://developers.openai.com/codex/cli/) 或 [Claude Code](https://code.claude.com/docs/en/setup)。
@@ -73,7 +87,7 @@ wx-agent user stop teammate    # 只停止指定用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.20.0/wx-codex-bridge-0.20.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -81,7 +95,7 @@ wx-agent start
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.19.0/wx-codex-bridge-0.19.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.20.0/wx-codex-bridge-0.20.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 ```
