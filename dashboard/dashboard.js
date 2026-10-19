@@ -8,6 +8,7 @@ async function refresh(){
  $('users').replaceChildren();for(const u of data.users){const b=document.createElement('button');b.className='user'+(u.name===user?' selected':'');b.textContent=u.name+' · '+(u.status?.status==='starting'?'启动或配置中':u.status?'运行中':u.bound?'已停止':'未绑定');b.onclick=()=>act(async()=>{user=u.name;invalidate();await refresh();if($('log-panel').open)await loadLogs();});$('users').append(b);}
  const u=data.users.find(u=>u.name===user);if(!u)return;const s=u.status,next=user+':'+(s?.engine || u.engine);if(context!==next){invalidate();context=next;}
  $('title').textContent=user+' 的工作区';$('engine').value=s?.engine || u.engine;
+ $('user-remove').hidden=user==='default' || u.bound!==false;$('user-remove').disabled=!!s;
  const running=!!s && s.status!=='starting',idle=running && s.task==='空闲';
  $('set-workspace').disabled=$('set-project').disabled=!!s && !idle;
  $('workspace-path').value=s?.workspace || u.workspace || '';$('start').disabled=!!s || u.bound===false;$('pair-start').disabled=!!s || !!u.bound;$('stop').disabled=!idle;
@@ -61,3 +62,5 @@ $('pair-start').onclick=()=>act(beginPair);
 $('pair-submit').onclick=()=>act(async()=>{const code=$('pair-code').value;$('pair-code').value='';await api('pairing-code',{operationId:pairingByUser.get(user),value:code});await pollPair();});
 $('pair-cancel').onclick=()=>act(async()=>{const stamp=epoch,r=await api('pairing-cancel',{operationId:pairingByUser.get(user)});if(stamp===epoch){showPair(r);pairingByUser.delete(user);await refresh();}});
 setInterval(()=>{void pollPair();},1000);
+
+$('user-remove').onclick=()=>{const selected=user;if(!confirm(`删除未绑定用户 ${selected}？用户将从列表移除，工作文件归档保留。`))return;act(async()=>{const r=await api('user-remove',{confirm:true});pairingByUser.delete(selected);user='default';invalidate();await refresh();return '用户已删除，文件归档于：'+r.archive;});};

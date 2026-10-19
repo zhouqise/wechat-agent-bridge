@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {startDashboard} from '../dashboard.mjs';
-import {paths,writeJSON} from '../paths.mjs';
+import {paths,writeJSON,acquireLock,releaseLock} from '../paths.mjs';
 import {serve} from '../service.mjs';
 test('面板仅监听回环、认证及来源校验，用户隔离和日志凭证遮盖',async t=>{
  const base=await fs.mkdtemp(path.join(os.tmpdir(),'wxpanel-'));t.after(()=>fs.rm(base,{recursive:true,force:true}));
@@ -53,4 +53,17 @@ test('页面新增用户、扫码绑定接口与同名保护',async t=>{
  for(let i=0;i<100;i++){state=await (await request({action:'pairing-status',user:'alice',operationId:op.operationId})).json();if(state.phase==='completed')break;await new Promise(r=>setTimeout(r,10));}
  assert.equal(state.phase,'completed');assert.equal(starts,1);assert.ok(!JSON.stringify(state).includes('PRIVATE_TOKEN'));assert.equal((await request({action:'pairing-status',user:'default',operationId:op.operationId})).status,400);
  const users=await (await request({action:'users'})).json();assert.equal(users.users.find(u=>u.name==='alice').bound,true);
+});
+
+test('页面删除仅限未绑定新增用户：确认、运行锁、绑定保护及文件归档',async t=>{
+ const base=await fs.mkdtemp(path.join(os.tmpdir(),'wxpanelremove-'));const d=await startDashboard({base});t.after(async()=>{await d.close();await fs.rm(base,{recursive:true,force:true});});
+ const request=body=>fetch(d.origin+'/api',{method:'POST',headers:{Origin:d.origin,Authorization:'Bearer '+d.token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ await request({action:'user-create',value:'alice'});const p=paths({WX_CODEX_HOME:base,WX_AGENT_USER:'alice'});await fs.writeFile(path.join(p.workspace,'keep.txt'),'keep');
+ assert.equal((await request({action:'user-remove',user:'alice'})).status,400);
+ assert.equal((await request({action:'user-remove',user:'default',confirm:true})).status,400);
+ await acquireLock(p);try{assert.equal((await request({action:'user-remove',user:'alice',confirm:true})).status,400);}finally{await releaseLock(p);}
+ await writeJSON(p.session,{owner:'bound'});assert.equal((await request({action:'user-remove',user:'alice',confirm:true})).status,400);
+ await fs.rm(p.session);const removed=await (await request({action:'user-remove',user:'alice',confirm:true})).json();assert.equal(removed.ok,true);assert.equal(await fs.readFile(path.join(removed.archive,'workspace','keep.txt'),'utf8'),'keep');assert.equal(await fs.stat(path.join(removed.archive,'running.lock')).then(()=>true,()=>false),false);
+ const users=await (await request({action:'users'})).json();assert.deepEqual(users.users.map(u=>u.name),['default']);assert.equal((await request({action:'user-remove',user:'alice',confirm:true})).status,400);
+ assert.equal((await request({action:'user-create',value:'alice'})).status,200);
 });
