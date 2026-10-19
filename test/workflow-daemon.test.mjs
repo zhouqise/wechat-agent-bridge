@@ -12,6 +12,7 @@ const exec=promisify(execFile),cli=fileURLToPath(new URL('../wx-agent.mjs',impor
 test('完整流程：文件+说明合并、队列串行、结果自动回传、切换项目再恢复',{timeout:60000},async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'wxflow-')),mock=path.join(dir,'agent.mjs'),preload=path.join(dir,'offline.mjs'),ws=path.join(dir,'work'),other=path.join(dir,'other');await fs.mkdir(ws);await fs.mkdir(other);
  await fs.writeFile(mock,`import fs from 'node:fs';import path from 'node:path';import {createInterface} from 'node:readline';
+if(process.cwd().includes('fail-initialize'))process.exit(1);
 const send=m=>process.stdout.write(JSON.stringify(m)+'\\n');let thread,turn=0;
 createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.method==='thread/start'||m.method==='thread/resume'){thread=m.params.threadId||'thread-'+path.basename(m.params.cwd);send({id:m.id,result:{thread:{id:thread}}});}
 else if(m.method==='turn/start'){const id='turn-'+(++turn),p=m.params;fs.appendFileSync(process.env.FLOW_CALLS,JSON.stringify(p)+'\\n');send({id:m.id,result:{turn:{id}}});if(p.input[0].text==='crash-test'){setTimeout(()=>process.exit(1),50);return;}setTimeout(()=>{fs.mkdirSync(path.join(p.cwd,'wx-agent-output'),{recursive:true});fs.writeFileSync(path.join(p.cwd,'wx-agent-output','result'+turn+'.txt'),'result '+turn);send({method:'item/completed',params:{threadId:thread,turnId:id,item:{id:'msg'+id,type:'agentMessage',phase:'final_answer',text:'done'}}});send({method:'turn/completed',params:{threadId:thread,turn:{id,status:'completed'}}});},2200);}
@@ -56,6 +57,23 @@ return new Response(JSON.stringify({ret:0,msgs}));};`);
   await batch([msg('after recovery'),msg('/开始')]);await wait(async()=>(await calls()).length===beforeCrash+2 && (await status()).task==='空闲');
   assert.equal((await calls()).filter(x=>x.input[0].text==='crash-test').length,1);
   await control(p,'admin',{action:'clear'});assert.equal((await inspect()).conversations.length,1);
+  const fresh=path.join(dir,'新的工作目录 with space');await fs.mkdir(fresh);
+  const priorConversation=(await status()).conversation;
+  await batch([msg('/目录 "'+fresh+'"')]);await wait(async()=>(await status()).workspace===await fs.realpath(fresh));
+  const freshConversation=(await status()).conversation;assert.notEqual(freshConversation,priorConversation);
+  const count=(await calls()).length;await batch([msg('workspace task'),msg('/开始')]);await wait(async()=>(await calls()).length===count+1);
+  assert.match((await control(p,'admin',{action:'workspace',value:ws})).error,/任务/);
+  await wait(async()=>(await status()).task==='空闲');assert.equal((await calls()).at(-1).cwd,await fs.realpath(fresh));
+  await batch([msg('/工作目录 '+ws)]);await wait(async()=>(await status()).workspace===await fs.realpath(ws));assert.equal((await status()).conversation,priorConversation);
+  await control(p,'admin',{action:'workspace',value:fresh});assert.equal((await status()).conversation,freshConversation);
+  const beforeFail=(await status()).conversation;
+  const invalid=path.join(dir,'fail-initialize');await fs.mkdir(invalid);
+  assert.ok((await control(p,'admin',{action:'workspace',value:invalid})).error);assert.equal((await status()).workspace,await fs.realpath(fresh));assert.equal((await status()).agentReady,true);
+  await fs.rename(path.join(dir,'config.json'),path.join(dir,'config.backup'));await fs.mkdir(path.join(dir,'config.json'));
+  assert.ok((await control(p,'admin',{action:'workspace',value:ws})).error);assert.equal((await status()).conversation,beforeFail);assert.equal((await status()).agentReady,true);
+  await fs.rmdir(path.join(dir,'config.json'));await fs.rename(path.join(dir,'config.backup'),path.join(dir,'config.json'));
+  await run('restart');assert.equal((await status()).workspace,await fs.realpath(fresh));assert.equal((await status()).conversation,freshConversation);
+
 
 
  }finally{await run('stop').catch(()=>{});await fs.rm(dir,{recursive:true,force:true});}

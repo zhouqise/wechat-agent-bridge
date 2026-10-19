@@ -59,7 +59,7 @@ wx-agent dashboard            # 浏览器集中管理所有用户
 | **本机管理面板** | 浏览器集中管理用户、启停、任务、会话、引擎、模型与日志 |
 | **连接恢复与安静通知** | 接收故障持续重试，引擎断开自动重建；短任务直接回结果，长任务延迟提示 |
 | **双引擎与模型切换** | 微信切换 Codex / Claude Code；支持本机登录、API Key、自定义接口和模型设置 |
-| **多项目、多会话** | 切换预先登记的项目；创建、切换、删除会话，或清空当前列表并新建；各组上下文独立 |
+| **多项目、多会话** | 直接切换已有目录或已登记项目；创建、切换、删除会话，或清空当前列表并新建；各组上下文独立 |
 | **连续消息合并** | 先发文件再补说明，或连续发截图，合并成一项任务 |
 | **每用户任务队列** | 忙碌时自动排队；查看任务、立即提交、按编号取消或清空等待队列 |
 | **截图与扫描 PDF OCR** | 图片交给模型分析，并可补充本地中英文 OCR；扫描 PDF 按页补充识别文字 |
@@ -77,7 +77,7 @@ wx-agent dashboard            # 浏览器集中管理所有用户
 macOS / Linux：
 
 ```bash
-npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.20.0/wx-codex-bridge-0.20.0.tgz --ignore-scripts
+npm install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.21.0/wx-codex-bridge-0.21.0.tgz --ignore-scripts
 wx-agent setup
 wx-agent start
 ```
@@ -85,7 +85,7 @@ wx-agent start
 Windows PowerShell：
 
 ```powershell
-npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.20.0/wx-codex-bridge-0.20.0.tgz --ignore-scripts
+npm.cmd install -g https://github.com/zhouqise/wechat-agent-bridge/releases/download/v0.21.0/wx-codex-bridge-0.21.0.tgz --ignore-scripts
 wx-agent.cmd setup
 wx-agent.cmd start
 ```
@@ -130,10 +130,10 @@ Windows PowerShell 可使用 `wx-agent.cmd dashboard`。浏览器会自动打开
 | 服务启停 | 启动指定用户；仅在空闲时停止，避免打断任务 |
 | 任务 | 查看执行中的任务、当前阶段和等待队列 |
 | 会话 | 新建、切换、删除；清空当前用户、项目、引擎的列表并新建 |
-| 引擎与配置 | 切换 Codex / Claude Code、模型、已登记项目和通知模式 |
+| 引擎与配置 | 切换 Codex / Claude Code、模型、工作目录、已登记项目和通知模式 |
 | 日志 | 查看所选用户的最近日志，辅助排查问题 |
 
-配置与会话变更需要服务运行且任务空闲。取消任务、清空等待队列及审批继续在微信完成。首次配置、账号认证、API 地址、扫码和项目登记使用现有 CLI 向导与命令。
+工作目录可在服务停止时保存，下次启动生效；运行时切换需要任务空闲。其他配置与会话变更需要服务运行且任务空闲。取消任务、清空等待队列及审批继续在微信完成。首次配置、账号认证、API 地址、扫码和项目登记使用现有 CLI 向导与命令。
 
 面板仅监听 `127.0.0.1`，每次启动使用随机访问凭证，完整链接请勿分享。**面板终端需保持运行**；按 Ctrl+C 只关闭面板，已启动的桥接服务继续在后台运行。
 
@@ -193,19 +193,30 @@ ID：a1b2c3d4
 
 会话按**用户 → 项目 → 引擎**分别管理，每组最多 100 个。运行、排队或回传期间可以查看列表，变更会话需先结束当前任务并清空等待队列。列表只包含本桥接登记的会话，不导入桌面应用或 CLI 的全部历史。
 
-### 一条微信切换项目
+### 一条微信切换工作目录
 
-先在电脑上登记允许使用的目录：
+直接发送已有目录的完整路径，无需提前登记：
 
-```bash
-wx-agent stop
-wx-agent project add demo /absolute/path/to/project
-wx-agent start
+```text
+/目录
+/目录 /Users/yourname/Projects/demo
+/目录 C:\Projects\demo
 ```
 
-Windows 路径示例：`wx-agent project add demo "C:\Projects\demo"`。目录需已存在。
+`/目录` 查询当前目录，`/工作目录`、`/切换目录` 也是别名。路径可以含空格。运行中的服务会立即切换，首次进入创建会话，返回原目录恢复该引擎的会话；切换前须完成或取消当前任务，并清空等待队列。切换会话不会回滚文件。
 
-之后在微信发送 `/项目` 查看列表，发送 `/项目 demo` 切换。各项目分别恢复对应引擎的会话；同一项目下的多个会话共用工作目录，切换会话不会回滚文件。为指定用户登记项目见[项目管理文档](docs/operations.md#登记多个项目)。
+电脑端也可在任意位置执行：
+
+```bash
+wx-agent workspace "/absolute/path/Project A"
+wx-agent --user girlfriend workspace "/absolute/path/Project B"
+```
+
+不带路径可查询。服务停止时保存选择，下次启动生效；浏览器面板也提供工作目录输入框。目录必须存在且可访问，不会自动创建，不支持相对路径或 `~`。选择会持久保存，重启后继续使用。
+
+原有 `/项目` 和 `/项目 名称` 继续可用，发送 `/项目 default` 返回安装时配置的默认工作区。也可[为常用目录登记名称](docs/operations.md#登记多个项目)。
+
+**每个绑定用户都可以选择这台电脑上本机账号可访问的任意已有目录。**多用户配置与会话独立，但没有文件系统隔离；仅向可信的人开放绑定，避免多人同时修改同一目录。详见[工作目录管理](docs/operations.md#切换工作目录)。
 
 ## 按需开启媒体与文档能力
 
@@ -236,6 +247,7 @@ OCR、视频转写可能存在错漏，视频画面是抽样；Office 复杂版�
 | 引擎与模型 | `/引擎`、`/引擎 claude`、`/引擎 codex`、`/模型`、`/模型 模型名` |
 | 会话管理 | `/会话`、`/新会话 名称`、`/切换会话 序号或ID`、`/删除会话 ID` |
 | 清空会话 | `/清空会话`（别名 `/清空所有会话`），清空当前列表并新建 |
+| 工作目录 | `/目录`、`/目录 完整路径`（别名 `/工作目录`、`/切换目录`） |
 | 项目切换 | `/项目`、`/项目 名称` |
 | 队列管理 | `/任务`、`/开始`、`/取消 任务编号`、`/清空队列` |
 | 进度与结果 | `/状态`、`/取消`、`/结果` |

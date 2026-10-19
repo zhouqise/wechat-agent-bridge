@@ -6,6 +6,8 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {paths,readJSON} from './paths.mjs';
 import {userNames,requireUser,profileState} from './users.mjs';
+import {workspace} from './workspace.mjs';
+import {projectList} from './projects.mjs';
 import {control} from './service.mjs';
 const run=promisify(execFile);
 export async function startDashboard({base=paths().baseDir,port=0}={}) {
@@ -24,13 +26,14 @@ export async function startDashboard({base=paths().baseDir,port=0}={}) {
       const auth=req.headers.authorization || '',expected='Bearer '+token;
       if(Buffer.byteLength(auth)!==Buffer.byteLength(expected)||!timingSafeEqual(Buffer.from(auth),Buffer.from(expected)))return reply(401,{error:'请使用终端输出的完整管理链接'});
       if(req.url!=='/api' || req.method!=='POST' || req.headers.origin!==origin || req.headers['content-type']!=='application/json')return reply(403,{error:'请求不允许'});
-      let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return reply(413,{error:'请求过大'});}
+      req.setEncoding('utf8');let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return reply(413,{error:'请求过大'});}
       const {action,user='default',value='',operation}=JSON.parse(raw);
       if(action==='users'){
         const names=['default',...await userNames(base)];
-        const users=await Promise.all(names.map(async name=>{const p=await resolveUser(name),status=await profileState(p),config=await readJSON(p.config,{});return {name,status,engine:config.engine || 'codex',workspace:config.workspace || p.workspace};}));return reply(200,{users});
+        const users=await Promise.all(names.map(async name=>{const p=await resolveUser(name),status=await profileState(p),config=await readJSON(p.config,{});return {name,status,engine:config.engine || 'codex',workspace:status?.workspace || projectList(config,p.workspace)[config.currentProject || 'default'] || p.workspace};}));return reply(200,{users});
       }
       const p=await resolveUser(user);
+      if(action==='workspace'){if(typeof value!=='string' || !value.trim())throw Error('请输入完整目录路径');return reply(200,await workspace(p,value));}
       if(action==='inspect')return reply(200,await control(p,'admin',{action:'inspect'}));
       if(action==='admin'){
         if(!['engine','project','new','switch','delete','clear','notifications'].includes(operation))throw Error('未知操作');

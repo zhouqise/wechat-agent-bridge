@@ -25,3 +25,13 @@ test('面板仅监听回环、认证及来源校验，用户隔离和日志凭�
  assert.equal((await (await request({action:'admin',operation:'new',value:'test'})).json()).ok,true);assert.ok(calls.includes('new'));
  const page=await fetch(d.origin);assert.match(page.headers.get('content-security-policy'),/frame-ancestors 'none'/);assert.ok(!(await page.text()).includes(d.token));
 });
+test('面板停止状态切换工作目录、实际目录显示及中文分块请求',async t=>{
+ const base=await fs.mkdtemp(path.join(os.tmpdir(),'wxpaneldir-')),target=path.join(base,'中文 target');await fs.mkdir(target);const p=paths({WX_CODEX_HOME:base});await writeJSON(p.config,{workspace:base});
+ const d=await startDashboard({base});t.after(async()=>{await new Promise(r=>d.server.close(r));await fs.rm(base,{recursive:true,force:true});});
+ const request=body=>fetch(d.origin+'/api',{method:'POST',headers:{Origin:d.origin,Authorization:'Bearer '+d.token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ const result=await (await request({action:'workspace',value:target})).json();assert.equal(result.applied,'next-start');assert.equal(result.workspace,await fs.realpath(target));
+ const data=await (await request({action:'users'})).json();assert.equal(data.users[0].workspace,await fs.realpath(target));assert.equal(data.users[0].status,null);
+ const before=await fs.readFile(p.config,'utf8');assert.equal((await request({action:'workspace',value:'relative'})).status,400);assert.equal(await fs.readFile(p.config,'utf8'),before);
+ const bytes=Buffer.from(JSON.stringify({action:'workspace',value:target})),split=bytes.indexOf(Buffer.from('中'))+1;
+ const chunked=await new Promise((resolve,reject)=>{const req=http.request(d.origin+'/api',{method:'POST',headers:{Origin:d.origin,Authorization:'Bearer '+d.token,'Content-Type':'application/json'}},res=>{let out='';res.setEncoding('utf8');res.on('data',b=>out+=b);res.on('end',()=>resolve(JSON.parse(out)));});req.on('error',reject);req.write(bytes.subarray(0,split));setTimeout(()=>req.end(bytes.subarray(split)),10);});assert.equal(chunked.workspace,await fs.realpath(target));
+});

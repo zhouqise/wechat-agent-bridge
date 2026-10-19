@@ -6,7 +6,7 @@ import {readJSON,writeJSON} from './paths.mjs';
 export async function control(p,command='status',params={}) {
   const token=(await readJSON(p.controlToken,{})).token;
   return new Promise((resolve,reject)=>{
-    const socket=net.createConnection(p.socket);let text='';
+    const socket=net.createConnection(p.socket);socket.setEncoding('utf8');let text='';
     const timer=setTimeout(()=>{socket.destroy();reject(new Error('管理接口超时'));},['models','admin'].includes(command)?65000:2000);
     socket.on('connect',()=>socket.write(JSON.stringify({...params,command,token})+'\n'));
     socket.on('data',buf=>{
@@ -24,10 +24,10 @@ export async function serve(p,status,stop,setModel,listModels,admin) {
   if(!win && Buffer.byteLength(p.socket)>100)throw new Error('数据目录路径过长，请用 WX_CODEX_HOME 指定较短路径');
   if(!win)await fs.rm(p.socket,{force:true});
   const server=net.createServer(socket=>{
-    let data='';socket.setTimeout(2000,()=>socket.destroy());
+    let data='',bytes=0;socket.setEncoding('utf8');socket.setTimeout(2000,()=>socket.destroy());
     socket.on('error',()=>{});
     socket.on('data',buf=>{
-      data+=buf.toString();if(data.length>1024){socket.destroy();return;}
+      data+=buf;bytes+=Buffer.byteLength(buf);if(bytes>8192){socket.destroy();return;}
       if(!data.includes('\n'))return;
       let command,request;
       try {

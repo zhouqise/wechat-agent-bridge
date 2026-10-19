@@ -1,6 +1,6 @@
 {
   "name": "wx-codex-bridge",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -52,7 +52,9 @@
     "conversations.mjs",
     "setup-engines.mjs",
     "dashboard.mjs",
-    "dashboard"
+    "dashboard",
+    "workspace.mjs",
+    "workspace-transition.mjs"
   ],
   "os": [
     "darwin",

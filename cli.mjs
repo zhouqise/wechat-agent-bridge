@@ -4,7 +4,7 @@ import {paths, privateDir, acquireLock, releaseLock, readJSON, writeJSON,alive} 
 import {serve} from './service.mjs';
 import {createInterface} from 'node:readline/promises';
 import QRCode from 'qrcode';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {BASE, api, trustedBase, acceptBatch} from './bridge.mjs';
 import {engineName,makeController} from './engines.mjs';
 import {modelListText,modelInfo,prepareModel} from './models.mjs';
@@ -12,8 +12,9 @@ import {officeInputs,workspaceDir,FILE_EXTS} from './office.mjs';
 import {sendOfficeFile} from './file-send.mjs';
 import {webInputs} from './web.mjs';
 import {changeConversation,isConversationMutation} from './conversations.mjs';
+import {WorkspaceTransition} from './workspace-transition.mjs';
 import {TaskQueue} from './task-queue.mjs';
-import {projectList,projectPath} from './projects.mjs';
+import {projectList,projectPath,prepareWorkspace} from './projects.mjs';
 import {outputSnapshot,returnFiles} from './auto-files.mjs';
 import {ocrImages} from './ocr.mjs';
 import {mediaInputs} from './av.mjs';
@@ -33,6 +34,7 @@ let lastReceivedAt = null;
 let stopping = false;
 let saving = Promise.resolve();
 let recoveryTimer;
+let workspaceTransition,cleaning;
 const health={wechat:'connecting',failures:0,nextRetryAt:null,engineRetries:0};
 async function save(state) {
   const data = JSON.stringify(state);
@@ -45,20 +47,16 @@ async function save(state) {
   saving = job.catch(() => {});
   return job;
 }
-async function clean() {
-  if (stopping) return;
-  stopping = true;
-  clearInterval(recoveryTimer);
-  tasks?.close();
-  const preparing=controller?.active?.abort?controller.starting:null;
-  controller?.close();
-  await preparing;
-  await saving;
-  await server?.close();
-  if (locked) {
-    await fs.rm(qrPath, {force:true});
-    await releaseLock(p);
-  }
+function clean() {
+  if(cleaning)return cleaning;
+  stopping=true;clearInterval(recoveryTimer);tasks?.close();
+  cleaning=(async()=>{
+    await workspaceTransition?.wait();
+    const preparing=controller?.active?.abort?controller.starting:null;
+    controller?.close();await preparing;await saving;await server?.close();
+    if(locked){await fs.rm(qrPath,{force:true});await releaseLock(p);}
+  })();
+  return cleaning;
 }
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {void clean().finally(() => process.exit(0));});
 
@@ -133,7 +131,7 @@ async function main() {
   const echo = process.argv.includes('--echo');
   let contextToken,config,cwd,engine='codex',taskToken,beforeFiles;
   let currentProject='default';
-  let selectEngine,selectModel,changing=false;
+  let selectEngine,selectModel,selectWorkspace,changing=false;
   if (!echo) {
     config = await readJSON(p.config, {});
     const requested = config.workspace || p.workspace;
@@ -179,6 +177,36 @@ async function main() {
       }finally{changing=false;}
     };
     await selectEngine(config.engine || 'codex');
+    workspaceTransition=new WorkspaceTransition({
+      isStopping:()=>stopping,
+      prepare:async value=>{
+        const next=await prepareWorkspace(config,p.workspace,value);
+        if(next.cwd===cwd)return {unchanged:true,result:{ok:true,workspace:cwd,project:currentProject,conversation:controller.state.currentConversation,applied:'live'}};
+        next.draft=structuredClone(state);next.key=createHash('sha256').update(next.cwd).digest('hex');return next;
+      },
+      create:next=>makeController({engine,cwd:next.cwd,config:next.config,state:next.draft,
+        save:async()=>{if(next.published)await save(state);},send,
+        onFinish:async status=>{if(status==='completed' && !stopping)await returnFiles({cwd,before:beforeFiles,say:text=>controller.say(text),send:name=>sendOfficeFile({cwd,name,state,contextToken:taskToken})});}}),
+      persist:async(next,candidate)=>{
+        // Merge only the candidate's engine slot. Keep live cursor/deduplication
+        // and the task queue object: the receiver can still save state meanwhile.
+        state.projectSessions ||= {};
+        state.projectSessions[next.key]={...state.projectSessions[next.key],[engine]:candidate.state};
+        await save(state);
+      },
+      commit:next=>writeJSON(p.config,next.config),
+      publish:(next,candidate)=>{
+        const previous=controller;controller=candidate;config=next.config;cwd=next.cwd;currentProject=next.project;
+        state[engine]=candidate.state;next.published=true;
+        try{previous.close();}catch{console.log('旧引擎连接清理异常，请检查后台进程。');}
+        return {ok:true,workspace:cwd,project:currentProject,conversation:controller.state.currentConversation,applied:'live'};
+      }
+    });
+    selectWorkspace=async value=>{
+      if(stopping || changing || controller.active || tasks?.busy)throw Error('请先完成或取消当前任务，并清空等待队列后再切换工作目录');
+      changing=true;try{return await workspaceTransition.run(value);}finally{changing=false;}
+    };
+
     tasks=new TaskQueue({quiet:config.notifications!=='verbose',available:()=>controller.ready && !changing,state:state.tasks ||= {},save:()=>save(state),say:text=>controller.say(text),run:async task=>{
       if(!controller.ready)throw Error('引擎未连接');
       taskToken=task.contextToken;beforeFiles=null;
@@ -208,7 +236,8 @@ async function main() {
   server = await serve(p, () => ({pid:process.pid,startedAt,health:{...health},...(!echo?modelInfo(config,engine):{}),mode:echo?'echo':engine,engine,wechatBound:true,lastPollAt,lastReceivedAt,agentReady:!!controller?.ready,codexConnected:engine==='codex' && !!controller?.ready,workspace:cwd,project:currentProject,conversation:controller?.state.currentConversation,queued:tasks?.pending.length || 0,task:changing?'连接或配置变更中':controller?.active?(controller.approvals.size?'等待确认':'执行中'):(tasks?.busy?'排队中':'空闲')}), () => {void clean().finally(()=>process.exit(0));},selectModel,()=>modelListText(config,engine,controller?.rpc),async request=>{
     if(echo)throw Error('测试模式不支持管理');
     const {action,value=''}=request;
-    if(action==='inspect')return {current:controller.state.currentConversation,conversations:controller.state.conversations.map(({id,number,title,updatedAt})=>({id,number,title,updatedAt})),queue:tasks.pending.map(({id,text})=>({id,title:text.slice(0,80)})),active:tasks.active?{id:tasks.active.id,stage:controller.active?.stage}:null,projects:Object.keys(projectList(config,p.workspace)),notifications:config.notifications || 'quiet'};
+    if(action==='workspace')return selectWorkspace(value);
+    if(action==='inspect')return {workspace:cwd,current:controller.state.currentConversation,conversations:controller.state.conversations.map(({id,number,title,updatedAt})=>({id,number,title,updatedAt})),queue:tasks.pending.map(({id,text})=>({id,title:text.slice(0,80)})),active:tasks.active?{id:tasks.active.id,stage:controller.active?.stage}:null,projects:Object.keys(projectList(config,p.workspace)),notifications:config.notifications || 'quiet'};
     if(changing || tasks.busy || controller.active)throw Error('请等待任务完成或在微信取消并清空队列后操作');
     if(typeof value!=='string' || value.length>100)throw Error('参数无效');
     changing=true;
@@ -240,6 +269,14 @@ async function main() {
         contextToken = msg.context_token;
         if(changing){await controller.say('配置正在变更，请稍后重试。');return;}
         if(await tasks.command(text))return;
+        const directory=text.match(/^\/(目录|工作目录|切换目录)(?:\s+([\s\S]*))?$/);
+        if(directory){
+          if(directory[2]===undefined){await controller.say(`当前工作目录：${cwd}\n项目：${currentProject}\n/目录 完整路径 切换已有目录；不需要提前登记。\n返回默认目录：/项目 default`);return;}
+          let value=directory[2].trim();if(value.length>=2 && ['"',"'"].includes(value[0]) && value.at(-1)===value[0])value=value.slice(1,-1);
+          try{const result=await selectWorkspace(value);await controller.say(`工作目录已切换：${result.workspace}\n当前会话：${result.conversation}\n后续任务使用此目录，原目录文件和会话保留。`);}
+          catch(e){await controller.say('工作目录切换未完成：'+e.message);}return;
+        }
+
         if(text==='/项目') {await controller.say(`当前项目：${currentProject}\n`+Object.entries(projectList(config,p.workspace)).map(([n,dir])=>`/项目 ${n} — ${dir}`).join('\n'));return;}
         if(text.startsWith('/项目 ')) {
           if(tasks.busy || controller.active){await controller.say('请等待当前任务完成，并用 /清空队列 清除等待任务后再切换项目。');return;}

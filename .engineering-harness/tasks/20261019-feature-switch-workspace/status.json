@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 4,
+  "artifactMode": "staged",
+  "lifecycleVersion": 4,
+  "taskId": "20261019-feature-switch-workspace",
+  "type": "feature",
+  "phase": "handed-off",
+  "outcome": "completed",
+  "requirementState": "baseline-confirmed",
+  "ownershipState": "confirmed",
+  "updatedAt": "2026-10-19T10:14:34Z",
+  "blockers": [],
+  "designReview": {
+    "decision": "passed",
+    "reviewerType": "subagent",
+    "evidence": "design-review.md",
+    "reviewRecordedAt": "2026-10-19T09:52:05Z"
+  },
+  "designConfirmation": {
+    "confirmedBy": "user",
+    "evidence": "design.md",
+    "confirmedAt": "2026-10-19T09:52:05Z"
+  },
+  "designRevision": 1,
+  "designRevisions": [],
+  "planningConfirmation": {
+    "executionMode": "sequential",
+    "agentCapability": "subagents",
+    "evidence": "implementation-plan.md",
+    "confirmedBy": "user",
+    "confirmedAt": "2026-10-19T09:54:03Z",
+    "commitCheckpoint": "task"
+  },
+  "planItems": [
+    {
+      "id": "P-01",
+      "title": "目录解析与停止状态保存",
+      "scope": [
+        "projects.mjs",
+        "workspace.mjs",
+        "test/workspace.test.mjs"
+      ],
+      "status": "verified",
+      "evidence": "evidence.md",
+      "updatedAt": "2026-10-19T10:00:19Z",
+      "review": {
+        "decision": "passed",
+        "severity": "none",
+        "reviewerType": "fresh-self-review",
+        "evidence": "evidence.md",
+        "diffSnapshot": "sha256:bfe2ff0cd24a74f033b589f4c163a42505ff4fe07b70bd4c69b97a89f4353994",
+        "baseRevision": "d5feece9c29d263c314742d36ead107321845397",
+        "headRevision": "working-tree",
+        "allowedPaths": [
+          "projects.mjs",
+          "workspace.mjs",
+          "test/workspace.test.mjs"
+        ],
+        "reviewRecordedAt": "2026-10-19T10:00:19Z"
+      },
+      "checkpoint": null
+    },
+    {
+      "id": "P-02",
+      "title": "在线切换、会话恢复与停止协作",
+      "scope": [
+        "cli.mjs",
+        "service.mjs",
+        "engines.mjs",
+        "workspace-transition.mjs",
+        "test/workspace-transition.test.mjs",
+        "test/workflow-daemon.test.mjs",
+        "test/users.test.mjs"
+      ],
+      "status": "verified",
+      "evidence": "evidence.md",
+      "updatedAt": "2026-10-19T10:04:05Z",
+      "review": {
+        "decision": "passed",
+        "severity": "none",
+        "reviewerType": "subagent",
+        "evidence": "evidence.md",
+        "diffSnapshot": "sha256:52eccce038f3c869e9543c62b3632c552b172ccc4268a96ff81cf583079ed219",
+        "baseRevision": "d5feece9c29d263c314742d36ead107321845397",
+        "headRevision": "working-tree",
+        "allowedPaths": [
+          "cli.mjs",
+          "service.mjs",
+          "workspace-transition.mjs",
+          "test/workspace-transition.test.mjs",
+          "test/workflow-daemon.test.mjs"
+        ],
+        "reviewRecordedAt": "2026-10-19T10:04:05Z"
+      },
+      "checkpoint": null
+    },
+    {
+      "id": "P-03",
+      "title": "CLI 与浏览器入口",
+      "scope": [
+        "wx-agent.mjs",
+        "dashboard.mjs",
+        "dashboard/",
+        "controller.mjs",
+        "test/dashboard.test.mjs",
+        "test/workspace.test.mjs"
+      ],
+      "status": "verified",
+      "evidence": "evidence.md",
+      "updatedAt": "2026-10-19T10:12:18Z",
+      "review": {
+        "decision": "passed",
+        "severity": "none",
+        "reviewerType": "subagent",
+        "evidence": "evidence.md",
+        "diffSnapshot": "sha256:ee5d41a933b2115e45b106785ccae8b7bddaaec9b9fe04536e02b8d7eab0d724",
+        "baseRevision": "d5feece9c29d263c314742d36ead107321845397",
+        "headRevision": "working-tree",
+        "allowedPaths": [
+          "wx-agent.mjs",
+          "dashboard.mjs",
+          "dashboard/",
+          "controller.mjs",
+          "test/dashboard.test.mjs",
+          "test/workspace.test.mjs"
+        ],
+        "reviewRecordedAt": "2026-10-19T10:12:18Z"
+      },
+      "checkpoint": null
+    },
+    {
+      "id": "P-04",
+      "title": "文档、打包与发布验证",
+      "scope": [
+        "README.md",
+        "docs/operations.md",
+        "CHANGELOG.md",
+        "package.json",
+        "package-lock.json",
+        "rpc.mjs",
+        "wx-agent.mjs",
+        ".github/workflows/test.yml",
+        ".engineering-harness/",
+        "docs/setup.md",
+        "SECURITY.md"
+      ],
+      "status": "verified",
+      "evidence": "evidence.md",
+      "updatedAt": "2026-10-19T10:14:34Z",
+      "review": {
+        "decision": "passed",
+        "severity": "none",
+        "reviewerType": "subagent",
+        "evidence": "evidence.md",
+        "diffSnapshot": "sha256:89ee60cef15ded6f114151e2a1ed4d2609b074c854709863c4f2d9f774bd2144",
+        "baseRevision": "d5feece9c29d263c314742d36ead107321845397",
+        "headRevision": "working-tree",
+        "allowedPaths": [
+          "README.md",
+          "docs/operations.md",
+          "CHANGELOG.md",
+          "package.json",
+          "package-lock.json",
+          "rpc.mjs",
+          "wx-agent.mjs",
+          ".github/workflows/test.yml",
+          ".engineering-harness/",
+          "docs/setup.md",
+          "SECURITY.md"
+        ],
+        "reviewRecordedAt": "2026-10-19T10:14:34Z"
+      },
+      "checkpoint": null
+    }
+  ],
+  "planningRevision": 1,
+  "planningRevisions": [],
+  "preferences": {
+    "resolvedAt": "2026-10-19T10:14:34Z",
+    "effective": {
+      "schemaVersion": 3,
+      "language": "zh-CN",
+      "responseDetail": "balanced",
+      "diagramFormat": "auto",
+      "executionModeDefault": "ask",
+      "commitCheckpointDefault": "ask"
+    },
+    "sources": {
+      "language": "user",
+      "responseDetail": "user",
+      "diagramFormat": "user",
+      "executionModeDefault": "user",
+      "commitCheckpointDefault": "user"
+    }
+  },
+  "history": [
+    {
+      "phase": "intake",
+      "outcome": "active",
+      "at": "2026-10-19T09:45:54Z",
+      "evidence": "requirement.md#source"
+    },
+    {
+      "phase": "context",
+      "outcome": "active",
+      "at": "2026-10-19T09:48:19Z",
+      "evidence": "requirement.md"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T09:52:05Z",
+      "evidence": "design.md"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T09:53:23Z",
+      "evidence": "implementation-plan.md",
+      "reason": "plan-item-registered",
+      "itemId": "P-01"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T09:53:23Z",
+      "evidence": "implementation-plan.md",
+      "reason": "plan-item-registered",
+      "itemId": "P-02"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T09:53:23Z",
+      "evidence": "implementation-plan.md",
+      "reason": "plan-item-registered",
+      "itemId": "P-03"
+    },
+    {
+      "phase": "specified",
+      "outcome": "active",
+      "at": "2026-10-19T09:53:23Z",
+      "evidence": "implementation-plan.md",
+      "reason": "plan-item-registered",
+      "itemId": "P-04"
+    },
+    {
+      "phase": "planned",
+      "outcome": "active",
+      "at": "2026-10-19T09:54:03Z",
+      "evidence": "implementation-plan.md"
+    },
+    {
+      "phase": "planned",
+      "outcome": "active",
+      "at": "2026-10-19T09:54:53Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-01",
+      "itemStatus": "red"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T09:54:53Z",
+      "evidence": "evidence.md"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T09:55:43Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-01",
+      "itemStatus": "green"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:00:19Z",
+      "evidence": "evidence.md",
+      "reason": "review-passed",
+      "itemId": "P-01"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:00:19Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-01",
+      "itemStatus": "verified"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:00:19Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-02",
+      "itemStatus": "red"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:03:23Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-02",
+      "itemStatus": "green"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:04:05Z",
+      "evidence": "evidence.md",
+      "reason": "review-passed",
+      "itemId": "P-02"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:04:05Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-02",
+      "itemStatus": "verified"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:04:55Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-03",
+      "itemStatus": "red"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:06:38Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-03",
+      "itemStatus": "green"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:12:18Z",
+      "evidence": "evidence.md",
+      "reason": "review-passed",
+      "itemId": "P-03"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:12:18Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-03",
+      "itemStatus": "verified"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:12:18Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-04",
+      "itemStatus": "red"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:14:34Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-04",
+      "itemStatus": "green"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:14:34Z",
+      "evidence": "evidence.md",
+      "reason": "review-passed",
+      "itemId": "P-04"
+    },
+    {
+      "phase": "red",
+      "outcome": "active",
+      "at": "2026-10-19T10:14:34Z",
+      "evidence": "evidence.md",
+      "reason": "plan-item-status",
+      "itemId": "P-04",
+      "itemStatus": "verified"
+    },
+    {
+      "phase": "green",
+      "outcome": "active",
+      "at": "2026-10-19T10:14:34Z",
+      "evidence": "evidence.md"
+    },
+    {
+      "phase": "verified",
+      "outcome": "active",
+      "at": "2026-10-19T10:14:34Z",
+      "evidence": "evidence.md"
+    },
+    {
+      "phase": "handed-off",
+      "outcome": "active",
+      "at": "2026-10-19T10:14:34Z",
+      "evidence": "handoff.md"
+    },
+    {
+      "phase": "handed-off",
+      "outcome": "completed",
+      "at": "2026-10-19T10:14:34Z",
+      "evidence": "handoff.md"
+    }
+  ]
+}
